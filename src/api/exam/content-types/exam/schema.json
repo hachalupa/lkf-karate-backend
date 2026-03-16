@@ -1,0 +1,45 @@
+{
+  "kind": "collectionType",
+  "collectionName": "exams",
+  "info": {
+    "singularName": "exam",
+    "pluralName": "exams",
+    "displayName": "Exam"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string"
+    },
+    "duration": {
+      "type": "integer"
+    },
+    "questionCount": {
+      "type": "integer"
+    },
+    "passingScore": {
+      "type": "integer"
+    },
+    "openAt": {
+      "type": "datetime"
+    },
+    "closeAt": {
+      "type": "datetime"
+    },
+    "course": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::course.course",
+      "inversedBy": "exams"
+    },
+    "exam_attempts": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::exam-attempt.exam-attempt",
+      "mappedBy": "exam"
+    }
+  }
+}

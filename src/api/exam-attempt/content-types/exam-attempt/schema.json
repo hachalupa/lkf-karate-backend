@@ -1,0 +1,45 @@
+{
+  "kind": "collectionType",
+  "collectionName": "exam_attempts",
+  "info": {
+    "singularName": "exam-attempt",
+    "pluralName": "exam-attempts",
+    "displayName": "ExamAttempt"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "score": {
+      "type": "integer"
+    },
+    "passed": {
+      "type": "boolean"
+    },
+    "startedAt": {
+      "type": "datetime"
+    },
+    "submittedAt": {
+      "type": "datetime"
+    },
+    "answers": {
+      "type": "json"
+    },
+    "questions": {
+      "type": "json"
+    },
+    "exam": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::exam.exam",
+      "inversedBy": "exam_attempts"
+    },
+    "user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "exam_attempts"
+    }
+  }
+}
