@@ -71,6 +71,9 @@
       "relation": "oneToMany",
       "target": "api::exam-attempt.exam-attempt",
       "mappedBy": "user"
+    },
+    "isAdmin": {
+      "type": "boolean"
     }
   }
 }

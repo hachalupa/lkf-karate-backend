@@ -17,10 +17,6 @@
     "description": {
       "type": "text"
     },
-    "slug": {
-      "type": "uid",
-      "targetField": "title"
-    },
     "category": {
       "type": "enumeration",
       "enum": [
@@ -50,6 +46,9 @@
       "relation": "oneToMany",
       "target": "api::chapter.chapter",
       "mappedBy": "course"
+    },
+    "slug": {
+      "type": "string"
     }
   }
 }

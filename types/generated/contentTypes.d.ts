@@ -491,7 +491,7 @@ export interface ApiCourseCourse extends Struct.CollectionTypeSchema {
     published: Schema.Attribute.Boolean;
     publishedAt: Schema.Attribute.DateTime;
     questions: Schema.Attribute.Relation<'oneToMany', 'api::question.question'>;
-    slug: Schema.Attribute.UID<'title'>;
+    slug: Schema.Attribute.String;
     title: Schema.Attribute.String;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -1077,6 +1077,7 @@ export interface PluginUsersPermissionsUser
       'oneToMany',
       'api::exam-attempt.exam-attempt'
     >;
+    isAdmin: Schema.Attribute.Boolean;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
