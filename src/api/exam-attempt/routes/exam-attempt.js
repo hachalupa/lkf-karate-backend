@@ -1,9 +1,26 @@
-'use strict';
+'use strict'
 
-/**
- * exam-attempt router
- */
+const { createCoreRouter } = require('@strapi/strapi').factories
 
-const { createCoreRouter } = require('@strapi/strapi').factories;
-
-module.exports = createCoreRouter('api::exam-attempt.exam-attempt');
+module.exports = {
+  routes: [
+    {
+      method: 'GET',
+      path: '/exam-attempts',
+      handler: 'exam-attempt.find',
+      config: { policies: [], middlewares: [] },
+    },
+    {
+      method: 'GET',
+      path: '/exam-attempts/all',
+      handler: 'exam-attempt.findAll',
+      config: { policies: [], middlewares: [] },
+    },
+    {
+      method: 'PUT',
+      path: '/exam-attempts/grade/:id',
+      handler: 'exam-attempt.grade',
+      config: { policies: [], middlewares: [] },
+    },
+  ],
+}
