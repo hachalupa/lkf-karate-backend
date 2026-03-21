@@ -1,0 +1,33 @@
+{
+  "kind": "collectionType",
+  "collectionName": "chapter_progresses",
+  "info": {
+    "singularName": "chapter-progress",
+    "pluralName": "chapter-progresses",
+    "displayName": "ChapterProgress"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "seen": {
+      "type": "boolean"
+    },
+    "seenAt": {
+      "type": "datetime"
+    },
+    "users_permissions_user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "chapter_progresses"
+    },
+    "chapter": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::chapter.chapter",
+      "inversedBy": "chapter_progresses"
+    }
+  }
+}

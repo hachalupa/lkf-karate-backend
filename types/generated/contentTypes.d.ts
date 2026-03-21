@@ -430,6 +430,41 @@ export interface AdminUser extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiChapterProgressChapterProgress
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'chapter_progresses';
+  info: {
+    displayName: 'ChapterProgress';
+    pluralName: 'chapter-progresses';
+    singularName: 'chapter-progress';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    chapter: Schema.Attribute.Relation<'manyToOne', 'api::chapter.chapter'>;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::chapter-progress.chapter-progress'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    seen: Schema.Attribute.Boolean;
+    seenAt: Schema.Attribute.DateTime;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    users_permissions_user: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+  };
+}
+
 export interface ApiChapterChapter extends Struct.CollectionTypeSchema {
   collectionName: 'chapters';
   info: {
@@ -441,6 +476,10 @@ export interface ApiChapterChapter extends Struct.CollectionTypeSchema {
     draftAndPublish: true;
   };
   attributes: {
+    chapter_progresses: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::chapter-progress.chapter-progress'
+    >;
     content: Schema.Attribute.Blocks;
     course: Schema.Attribute.Relation<'manyToOne', 'api::course.course'>;
     createdAt: Schema.Attribute.DateTime;
@@ -1065,6 +1104,10 @@ export interface PluginUsersPermissionsUser
   };
   attributes: {
     blocked: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    chapter_progresses: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::chapter-progress.chapter-progress'
+    >;
     confirmationToken: Schema.Attribute.String & Schema.Attribute.Private;
     confirmed: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     createdAt: Schema.Attribute.DateTime;
@@ -1127,6 +1170,7 @@ declare module '@strapi/strapi' {
       'admin::transfer-token': AdminTransferToken;
       'admin::transfer-token-permission': AdminTransferTokenPermission;
       'admin::user': AdminUser;
+      'api::chapter-progress.chapter-progress': ApiChapterProgressChapterProgress;
       'api::chapter.chapter': ApiChapterChapter;
       'api::course.course': ApiCourseCourse;
       'api::exam-attempt.exam-attempt': ApiExamAttemptExamAttempt;

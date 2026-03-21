@@ -34,6 +34,12 @@
       "relation": "oneToMany",
       "target": "api::question.question",
       "mappedBy": "chapter"
+    },
+    "chapter_progresses": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::chapter-progress.chapter-progress",
+      "mappedBy": "chapter"
     }
   }
 }

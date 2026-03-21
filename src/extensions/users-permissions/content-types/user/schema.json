@@ -91,6 +91,12 @@
     },
     "rejectionReason": {
       "type": "text"
+    },
+    "chapter_progresses": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::chapter-progress.chapter-progress",
+      "mappedBy": "users_permissions_user"
     }
   }
 }
