@@ -43,9 +43,25 @@ module.exports = {
     })
 
     if (existing) {
+      const now = new Date()
+      let remainingSeconds = exam.duration * 60
+
+      // Time based on when they started
+      const startedAt = new Date(existing.startedAt)
+      const secondsSinceStart = Math.floor((Number(now) - Number(startedAt)) / 1000)
+      remainingSeconds = Math.max(0, exam.duration * 60 - secondsSinceStart)
+
+      // If exam has a hard close time, use whichever is smaller
+      if (exam.closeAt) {
+        const closeAt = new Date(exam.closeAt)
+        const secondsUntilClose = Math.floor((Number(closeAt) - Number(now)) / 1000)
+        remainingSeconds = Math.min(remainingSeconds, secondsUntilClose)
+      }
+
       return ctx.send({
         attemptId: existing.id,
         duration: exam.duration,
+        remainingSeconds,
         questions: existing.questions.map(q => ({
           id: q.id,
           documentId: q.documentId,
@@ -90,73 +106,72 @@ module.exports = {
       },
     })
 
-    return ctx.send({
-      attemptId: attempt.id,
-      duration: exam.duration,
-      questions: questionsForClient,
-    })
+    // Calculate remaining time
+    let remainingSeconds = exam.duration * 60
+
+      if (exam.closeAt) {
+        const now = new Date()
+        const closeAt = new Date(exam.closeAt)
+        const secondsUntilClose = Math.floor((Number(closeAt) - Number(now)) / 1000)
+        remainingSeconds = Math.min(remainingSeconds, secondsUntilClose)
+      }
+
+      return ctx.send({
+        attemptId: attempt.id,
+        duration: exam.duration,
+        remainingSeconds,
+        showResults: exam.showResults ?? true,
+        questions: questionsForClient,
+      })
   },
 
- async submit(ctx) {
-  const user = ctx.state.user
+  async submit(ctx) {
+    const user = ctx.state.user
+    if (!user) return ctx.unauthorized()
 
-  if (!user) {
-    return ctx.unauthorized('You must be logged in')
-  }
-
-  const { attemptId, answers } = ctx.request.body
-
-  if (!attemptId || !answers) {
-    return ctx.badRequest('attemptId and answers are required')
-  }
-
-  // Find the attempt
-  const attempt = await strapi.db.query('api::exam-attempt.exam-attempt').findOne({
-    where: { id: attemptId, user: user.id },
-    populate: ['exam'],
-  })
-
-  if (!attempt) {
-    return ctx.notFound('Attempt not found')
-  }
-
-  if (attempt.submittedAt) {
-    return ctx.badRequest('Attempt already submitted')
-  }
-
-  // Grade the attempt
-  const questions = attempt.questions
-  let correct = 0
-
-  questions.forEach(q => {
-    const userAnswer = answers[q.id]
-    if (userAnswer !== undefined && userAnswer !== null) {
-      if (String(userAnswer).toLowerCase() === String(q.correctAnswer).toLowerCase()) {
-        correct++
-      }
+    const { attemptId, answers } = ctx.request.body
+    if (!attemptId || !answers) {
+      return ctx.badRequest('attemptId and answers are required')
     }
-  })
 
-  const score = Math.round((correct / questions.length) * 100)
-  const passed = score >= (attempt.exam?.passingScore || 70)
+    // Find the attempt
+    const attempt = await strapi.db.query('api::exam-attempt.exam-attempt').findOne({
+      where: { id: attemptId, user: user.id },
+      populate: ['exam'],
+    })
 
-  // Update attempt
-  await strapi.db.query('api::exam-attempt.exam-attempt').update({
-    where: { id: attemptId },
-    data: {
-      answers,
-      score,
-      passed,
-      submittedAt: new Date(),
-    },
-  })
+    if (!attempt) return ctx.notFound('Attempt not found')
+    if (attempt.submittedAt) return ctx.badRequest('Attempt already submitted')
 
-  return ctx.send({
-    score,
-    passed,
-    correct,
-    total: questions.length,
-  })
+    // Get exam directly using documentId from populated relation
+    const examData = attempt.exam
+    const passingScore = examData?.passingScore || 70
+    const showResults = examData?.showResults === true
+
+    // Grade
+    const questions = attempt.questions
+    let correct = 0
+    questions.forEach(q => {
+      const userAnswer = answers[q.id]
+      if (userAnswer !== undefined && userAnswer !== null) {
+        if (String(userAnswer).toLowerCase() === String(q.correctAnswer).toLowerCase()) {
+          correct++
+        }
+      }
+    })
+
+    const score = Math.round((correct / questions.length) * 100)
+    const passed = score >= passingScore
+
+    await strapi.db.query('api::exam-attempt.exam-attempt').update({
+      where: { id: attemptId },
+      data: { answers, score, passed, submittedAt: new Date() },
+    })
+
+    console.log('EXAM DATA:', examData)
+    console.log('SHOW RESULTS:', showResults)
+
+    return ctx.send({ score, passed, correct, total: questions.length, showResults })
 },
 
   async quickQuiz(ctx) {

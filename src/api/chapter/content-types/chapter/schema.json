@@ -40,6 +40,16 @@
       "relation": "oneToMany",
       "target": "api::chapter-progress.chapter-progress",
       "mappedBy": "chapter"
+    },
+    "media": {
+      "type": "media",
+      "multiple": true,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
     }
   }
 }

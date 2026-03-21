@@ -40,6 +40,9 @@
       "relation": "oneToMany",
       "target": "api::exam-attempt.exam-attempt",
       "mappedBy": "exam"
+    },
+    "showResults": {
+      "type": "boolean"
     }
   }
 }

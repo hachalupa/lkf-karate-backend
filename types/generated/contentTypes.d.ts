@@ -491,6 +491,10 @@ export interface ApiChapterChapter extends Struct.CollectionTypeSchema {
       'api::chapter.chapter'
     > &
       Schema.Attribute.Private;
+    media: Schema.Attribute.Media<
+      'images' | 'files' | 'videos' | 'audios',
+      true
+    >;
     order: Schema.Attribute.Integer;
     publishedAt: Schema.Attribute.DateTime;
     questions: Schema.Attribute.Relation<'oneToMany', 'api::question.question'>;
@@ -605,6 +609,7 @@ export interface ApiExamExam extends Struct.CollectionTypeSchema {
     passingScore: Schema.Attribute.Integer;
     publishedAt: Schema.Attribute.DateTime;
     questionCount: Schema.Attribute.Integer;
+    showResults: Schema.Attribute.Boolean;
     title: Schema.Attribute.String;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -635,10 +640,16 @@ export interface ApiQuestionQuestion extends Struct.CollectionTypeSchema {
       'api::question.question'
     > &
       Schema.Attribute.Private;
+    media: Schema.Attribute.Media<
+      'images' | 'files' | 'videos' | 'audios',
+      true
+    >;
     options: Schema.Attribute.JSON;
     publishedAt: Schema.Attribute.DateTime;
     text: Schema.Attribute.Text;
-    type: Schema.Attribute.Enumeration<['multiple_choice', 'yes_no']>;
+    type: Schema.Attribute.Enumeration<
+      ['multiple_choice', 'yes_no', 'open_text']
+    >;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
