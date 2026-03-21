@@ -158,4 +158,48 @@ module.exports = {
     total: questions.length,
   })
 },
+
+  async quickQuiz(ctx) {
+    const user = ctx.state.user
+    if (!user) return ctx.unauthorized()
+
+    const { courseDocumentId, count } = ctx.request.body
+    if (!courseDocumentId) return ctx.badRequest('courseDocumentId is required')
+
+    const course = await strapi.documents('api::course.course').findOne({
+      documentId: courseDocumentId,
+    })
+
+    if (!course) return ctx.notFound('Course not found')
+
+    const allQuestions = await strapi.db.query('api::question.question').findMany({
+      where: { course: course.id },
+    })
+
+    if (allQuestions.length === 0) {
+      return ctx.badRequest('No questions available for this course')
+    }
+
+    const questionCount = count === 'all'
+      ? allQuestions.length
+      : Math.min(Number(count) || 10, allQuestions.length)
+
+    const shuffled = allQuestions.sort(() => Math.random() - 0.5)
+    const selected = shuffled.slice(0, questionCount)
+
+    const questionsForClient = selected.map(q => ({
+      id: q.id,
+      documentId: q.documentId,
+      text: q.text,
+      type: q.type,
+      options: q.options,
+      correctAnswer: q.correctAnswer,
+    }))
+
+    return ctx.send({
+      questions: questionsForClient,
+      courseTitle: course.title,
+      total: questionsForClient.length,
+    })
+  },
 }
