@@ -32,6 +32,12 @@
       "relation": "manyToOne",
       "target": "api::course.course",
       "inversedBy": "questions"
+    },
+    "chapter": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::chapter.chapter",
+      "inversedBy": "questions"
     }
   }
 }

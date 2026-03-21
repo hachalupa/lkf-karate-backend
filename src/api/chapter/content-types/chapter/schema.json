@@ -28,6 +28,12 @@
       "relation": "manyToOne",
       "target": "api::course.course",
       "inversedBy": "chapters"
+    },
+    "questions": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::question.question",
+      "mappedBy": "chapter"
     }
   }
 }

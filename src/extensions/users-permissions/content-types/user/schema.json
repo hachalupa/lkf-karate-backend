@@ -74,6 +74,23 @@
     },
     "isAdmin": {
       "type": "boolean"
+    },
+    "firstName": {
+      "type": "string"
+    },
+    "lastName": {
+      "type": "string"
+    },
+    "verification": {
+      "type": "enumeration",
+      "enum": [
+        "pending",
+        "approved",
+        "rejected"
+      ]
+    },
+    "rejectionReason": {
+      "type": "text"
     }
   }
 }
