@@ -43,38 +43,53 @@ module.exports = {
     })
 
     if (existing) {
-      const now = new Date()
-      let remainingSeconds = exam.duration * 60
+  const now = new Date()
+  let remainingSeconds = exam.duration * 60
 
-      // Time based on when they started
-      const startedAt = new Date(existing.startedAt)
-      const secondsSinceStart = Math.floor((Number(now) - Number(startedAt)) / 1000)
-      remainingSeconds = Math.max(0, exam.duration * 60 - secondsSinceStart)
+  const startedAt = new Date(existing.startedAt)
+  const secondsSinceStart = Math.floor((Number(now) - Number(startedAt)) / 1000)
+  remainingSeconds = Math.max(0, exam.duration * 60 - secondsSinceStart)
 
-      // If exam has a hard close time, use whichever is smaller
-      if (exam.closeAt) {
-        const closeAt = new Date(exam.closeAt)
-        const secondsUntilClose = Math.floor((Number(closeAt) - Number(now)) / 1000)
-        remainingSeconds = Math.min(remainingSeconds, secondsUntilClose)
-      }
+  if (exam.closeAt) {
+    const closeAt = new Date(exam.closeAt)
+    const secondsUntilClose = Math.floor((Number(closeAt) - Number(now)) / 1000)
+    remainingSeconds = Math.min(remainingSeconds, secondsUntilClose)
+  }
 
-      return ctx.send({
-        attemptId: existing.id,
-        duration: exam.duration,
-        remainingSeconds,
-        questions: existing.questions.map(q => ({
-          id: q.id,
-          documentId: q.documentId,
-          text: q.text,
-          type: q.type,
-          options: q.options,
-        })),
-      })
-    }
+  // Re-fetch questions with media
+  const questionIds = existing.questions.map(q => q.id)
+  const questionsWithMedia = await strapi.db.query('api::question.question').findMany({
+    where: { id: { $in: questionIds } },
+    populate: ['media'],
+  })
+
+  // Preserve original question order
+  const questionsMap = {}
+  questionsWithMedia.forEach(q => { questionsMap[q.id] = q })
+  const orderedQuestions = existing.questions.map(q => questionsMap[q.id] || q)
+
+  const questionsForClient = orderedQuestions.map(q => ({
+    id: q.id,
+    documentId: q.documentId,
+    text: q.text,
+    type: q.type,
+    options: q.options,
+    media: q.media || null,
+  }))
+
+  return ctx.send({
+    attemptId: existing.id,
+    duration: exam.duration,
+    remainingSeconds,
+    showResults: exam.showResults === true,
+    questions: questionsForClient,
+  })
+}
 
     // Get all questions for this course
     const allQuestions = await strapi.db.query('api::question.question').findMany({
       where: { course: exam.course.id },
+      populate: ['media'],
     })
 
     if (allQuestions.length === 0) {
@@ -93,6 +108,7 @@ module.exports = {
       text: q.text,
       type: q.type,
       options: q.options,
+      media: q.media,
     }))
 
     // Store full questions (with answers) in the attempt
@@ -189,6 +205,7 @@ module.exports = {
 
     const allQuestions = await strapi.db.query('api::question.question').findMany({
       where: { course: course.id },
+      populate: ['media'],
     })
 
     if (allQuestions.length === 0) {
@@ -208,7 +225,7 @@ module.exports = {
       text: q.text,
       type: q.type,
       options: q.options,
-      correctAnswer: q.correctAnswer,
+      media: q.media,
     }))
 
     return ctx.send({
