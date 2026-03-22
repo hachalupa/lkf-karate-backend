@@ -43,6 +43,9 @@
     },
     "showResults": {
       "type": "boolean"
+    },
+    "resultsReleased": {
+      "type": "boolean"
     }
   }
 }

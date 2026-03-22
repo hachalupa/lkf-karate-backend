@@ -480,7 +480,7 @@ export interface ApiChapterChapter extends Struct.CollectionTypeSchema {
       'oneToMany',
       'api::chapter-progress.chapter-progress'
     >;
-    content: Schema.Attribute.Blocks;
+    content: Schema.Attribute.Text;
     course: Schema.Attribute.Relation<'manyToOne', 'api::course.course'>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -609,6 +609,7 @@ export interface ApiExamExam extends Struct.CollectionTypeSchema {
     passingScore: Schema.Attribute.Integer;
     publishedAt: Schema.Attribute.DateTime;
     questionCount: Schema.Attribute.Integer;
+    resultsReleased: Schema.Attribute.Boolean;
     showResults: Schema.Attribute.Boolean;
     title: Schema.Attribute.String;
     updatedAt: Schema.Attribute.DateTime;

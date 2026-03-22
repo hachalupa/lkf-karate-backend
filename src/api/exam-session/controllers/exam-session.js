@@ -186,8 +186,15 @@ module.exports = {
 
     console.log('EXAM DATA:', examData)
     console.log('SHOW RESULTS:', showResults)
-
-    return ctx.send({ score, passed, correct, total: questions.length, showResults })
+    
+    return ctx.send({ 
+      score, 
+      passed, 
+      correct, 
+      total: questions.length, 
+      showResults,
+      resultsReleased: examData?.resultsReleased === true,
+    })
 },
 
   async quickQuiz(ctx) {

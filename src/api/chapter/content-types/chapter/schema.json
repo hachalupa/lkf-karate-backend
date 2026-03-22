@@ -14,9 +14,6 @@
     "title": {
       "type": "string"
     },
-    "content": {
-      "type": "blocks"
-    },
     "order": {
       "type": "integer"
     },
@@ -50,6 +47,9 @@
         "videos",
         "audios"
       ]
+    },
+    "content": {
+      "type": "text"
     }
   }
 }
