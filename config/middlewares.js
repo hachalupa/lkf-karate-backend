@@ -18,8 +18,12 @@ module.exports = [
   {
     name: 'strapi::cors',
     config: {
-      origin: ['http://localhost:5174', 'http://localhost:5173', 'https://your-frontend.vercel.app'],
-      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
+      origin: [
+        'http://localhost:5174',
+        'http://localhost:4173',
+        'https://lkf-karate-frontend.vercel.app',
+      ],
+      methods: ['GET','POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
       headers: ['Content-Type', 'Authorization', 'Origin', 'Accept'],
       keepHeadersOnError: true,
     },
