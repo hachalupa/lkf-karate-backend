@@ -609,6 +609,10 @@ export interface ApiExamExam extends Struct.CollectionTypeSchema {
     passingScore: Schema.Attribute.Integer;
     publishedAt: Schema.Attribute.DateTime;
     questionCount: Schema.Attribute.Integer;
+    questions: Schema.Attribute.Relation<
+      'manyToMany',
+      'api::question.question'
+    >;
     resultsReleased: Schema.Attribute.Boolean;
     showResults: Schema.Attribute.Boolean;
     title: Schema.Attribute.String;
@@ -635,6 +639,7 @@ export interface ApiQuestionQuestion extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    exams: Schema.Attribute.Relation<'manyToMany', 'api::exam.exam'>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',

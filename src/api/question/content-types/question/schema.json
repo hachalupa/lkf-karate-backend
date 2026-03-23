@@ -49,6 +49,12 @@
         "videos",
         "audios"
       ]
+    },
+    "exams": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::exam.exam",
+      "mappedBy": "questions"
     }
   }
 }

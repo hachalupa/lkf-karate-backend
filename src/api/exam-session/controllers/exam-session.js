@@ -86,20 +86,33 @@ module.exports = {
   })
 }
 
-    // Get all questions for this course
-    const allQuestions = await strapi.db.query('api::question.question').findMany({
-      where: { course: exam.course.id },
-      populate: ['media'],
+    // Get exam with selected questions
+    const examWithQuestions = await strapi.documents('api::exam.exam').findOne({
+      documentId: examId,
+      populate: ['course', 'questions', 'questions.media'],
     })
 
-    if (allQuestions.length === 0) {
-      return ctx.badRequest('No questions available for this exam')
+    let selected = []
+
+    if (examWithQuestions.questions && examWithQuestions.questions.length > 0) {
+      // Use admin-selected questions, shuffle them
+      selected = examWithQuestions.questions.sort(() => Math.random() - 0.5)
+    } else {
+      // Fallback to random from course pool
+      const allQuestions = await strapi.db.query('api::question.question').findMany({
+        where: { course: exam.course.id },
+        populate: ['media'],
+      })
+      if (allQuestions.length === 0) {
+        return ctx.badRequest('No questions available for this exam')
+      }
+      const count = Math.min(exam.questionCount || 10, allQuestions.length)
+      selected = allQuestions.sort(() => Math.random() - 0.5).slice(0, count)
     }
 
-    // Pick random N questions
-    const count = Math.min(exam.questionCount || 10, allQuestions.length)
-    const shuffled = allQuestions.sort(() => Math.random() - 0.5)
-    const selected = shuffled.slice(0, count)
+    if (selected.length === 0) {
+      return ctx.badRequest('No questions available for this exam')
+    }
 
     // Strip correct answers before sending to client
     const questionsForClient = selected.map(q => ({

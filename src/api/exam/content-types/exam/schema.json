@@ -46,6 +46,12 @@
     },
     "resultsReleased": {
       "type": "boolean"
+    },
+    "questions": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::question.question",
+      "inversedBy": "exams"
     }
   }
 }
