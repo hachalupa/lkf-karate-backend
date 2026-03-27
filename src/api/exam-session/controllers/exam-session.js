@@ -227,7 +227,7 @@ module.exports = {
       where: { course: course.id },
       populate: ['media'],
     })
-
+    console.log('Questions from DB:', allQuestions.map(q => ({ id: q.id, text: q.text.slice(0, 20), correctAnswer: q.correctAnswer })))
     if (allQuestions.length === 0) {
       return ctx.badRequest('No questions available for this course')
     }
