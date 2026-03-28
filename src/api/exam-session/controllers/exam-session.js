@@ -122,7 +122,6 @@ module.exports = {
       type: q.type,
       options: q.options,
       media: q.media,
-      correctAnswer: q.correctAnswer,
     }))
 
     // Store full questions (with answers) in the attempt
@@ -248,6 +247,7 @@ module.exports = {
       type: q.type,
       options: q.options,
       media: q.media,
+      correctAnswer: q.correctAnswer,
     }))
 
     return ctx.send({
