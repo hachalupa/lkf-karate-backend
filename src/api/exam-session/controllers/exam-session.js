@@ -122,6 +122,7 @@ module.exports = {
       type: q.type,
       options: q.options,
       media: q.media,
+      correctAnswer: q.correctAnswer,
     }))
 
     // Store full questions (with answers) in the attempt
@@ -213,7 +214,7 @@ module.exports = {
   async quickQuiz(ctx) {
     const user = ctx.state.user
     if (!user) return ctx.unauthorized()
-
+    
     const { courseDocumentId, count } = ctx.request.body
     if (!courseDocumentId) return ctx.badRequest('courseDocumentId is required')
 
@@ -228,6 +229,7 @@ module.exports = {
       populate: ['media'],
     })
     console.log('Questions from DB:', allQuestions.map(q => ({ id: q.id, text: q.text.slice(0, 20), correctAnswer: q.correctAnswer })))
+    console.log('First question full object:', JSON.stringify(allQuestions[0]))
     if (allQuestions.length === 0) {
       return ctx.badRequest('No questions available for this course')
     }
