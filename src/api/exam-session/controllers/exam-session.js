@@ -71,10 +71,11 @@ module.exports = {
   const questionsForClient = orderedQuestions.map(q => ({
     id: q.id,
     documentId: q.documentId,
-    text: q.text,
+    text: q.text || q.textLv || q.textEn || q.textRu || '',
     type: q.type,
-    options: q.options,
-    media: q.media || null,
+    options: q.options || ['true', 'false'],
+    media: q.media,
+    correctAnswer: q.correctAnswer,
   }))
 
   return ctx.send({
@@ -182,7 +183,7 @@ module.exports = {
     let correct = 0
     questions.forEach(q => {
       const userAnswer = answers[q.id]
-      if (userAnswer !== undefined && userAnswer !== null) {
+      if (userAnswer !== undefined && userAnswer !== null && q.correctAnswer) {
         if (String(userAnswer).toLowerCase() === String(q.correctAnswer).toLowerCase()) {
           correct++
         }
@@ -243,9 +244,9 @@ module.exports = {
     const questionsForClient = selected.map(q => ({
       id: q.id,
       documentId: q.documentId,
-      text: q.text,
+      text: q.text || q.textLv || q.textEn || q.textRu || '',
       type: q.type,
-      options: q.options,
+      options: q.options || ['true', 'false'],
       media: q.media,
       correctAnswer: q.correctAnswer,
     }))

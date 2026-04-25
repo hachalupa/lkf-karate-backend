@@ -11,7 +11,7 @@
   },
   "pluginOptions": {},
   "attributes": {
-    "text": {
+    "textLv": {
       "type": "text"
     },
     "type": {
@@ -55,6 +55,24 @@
       "relation": "manyToMany",
       "target": "api::exam.exam",
       "mappedBy": "questions"
+    },
+    "textRu": {
+      "type": "text"
+    },
+    "textEn": {
+      "type": "text"
+    },
+    "sourceLang": {
+      "type": "string"
+    },
+    "sourceFile": {
+      "type": "string"
+    },
+    "text": {
+      "type": "text"
+    },
+    "order": {
+      "type": "integer"
     }
   }
 }

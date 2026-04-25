@@ -651,8 +651,14 @@ export interface ApiQuestionQuestion extends Struct.CollectionTypeSchema {
       true
     >;
     options: Schema.Attribute.JSON;
+    order: Schema.Attribute.Integer;
     publishedAt: Schema.Attribute.DateTime;
+    sourceFile: Schema.Attribute.String;
+    sourceLang: Schema.Attribute.String;
     text: Schema.Attribute.Text;
+    textEn: Schema.Attribute.Text;
+    textLv: Schema.Attribute.Text;
+    textRu: Schema.Attribute.Text;
     type: Schema.Attribute.Enumeration<
       ['multiple_choice', 'yes_no', 'open_text']
     >;
