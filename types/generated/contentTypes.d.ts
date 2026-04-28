@@ -476,6 +476,7 @@ export interface ApiChapterChapter extends Struct.CollectionTypeSchema {
     draftAndPublish: true;
   };
   attributes: {
+    blocks: Schema.Attribute.JSON;
     chapter_progresses: Schema.Attribute.Relation<
       'oneToMany',
       'api::chapter-progress.chapter-progress'
@@ -551,7 +552,7 @@ export interface ApiExamAttemptExamAttempt extends Struct.CollectionTypeSchema {
     singularName: 'exam-attempt';
   };
   options: {
-    draftAndPublish: true;
+    draftAndPublish: false;
   };
   attributes: {
     answers: Schema.Attribute.JSON;

@@ -133,6 +133,7 @@ module.exports = {
         startedAt: new Date(),
         questions: selected,
         answers: {},
+        publishedAt: new Date(),
       },
     })
 
