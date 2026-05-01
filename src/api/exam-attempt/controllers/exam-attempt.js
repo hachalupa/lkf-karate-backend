@@ -22,8 +22,7 @@ module.exports = createCoreController('api::exam-attempt.exam-attempt', ({ strap
     })
     if (!adminUser?.isAdmin) return ctx.forbidden()
     const attempts = await strapi.db.query('api::exam-attempt.exam-attempt').findMany({
-      where: {},
-      populate: ['exam', 'user'],
+      populate: ['exam', 'exam.course', 'user'],
       orderBy: { createdAt: 'desc' },
     })
     return ctx.send({ data: attempts })
