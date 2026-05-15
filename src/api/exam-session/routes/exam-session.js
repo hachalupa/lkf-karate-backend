@@ -1,22 +1,31 @@
 module.exports = {
   routes: [
     {
-      method: 'POST',
-      path: '/exams/start',
-      handler: 'exam-session.start',
+      method: "POST",
+      path: "/exams/start",
+      handler: "exam-session.start",
       config: { policies: [], middlewares: [] },
     },
     {
-      method: 'POST',
-      path: '/exams/submit',
-      handler: 'exam-session.submit',
+      method: "POST",
+      path: "/exams/submit",
+      handler: "exam-session.submit",
       config: { policies: [], middlewares: [] },
     },
     {
-      method: 'POST',
-      path: '/exams/quick-quiz',
-      handler: 'exam-session.quickQuiz',
+      method: "POST",
+      path: "/exams/quick-quiz",
+      handler: "exam-session.quickQuiz",
       config: { policies: [], middlewares: [] },
+    },
+    {
+      method: "POST",
+      path: "/exams/save-progress",
+      handler: "exam-session.saveProgress",
+      config: {
+        policies: [],
+        middlewares: [],
+      },
     },
   ],
-}
+};

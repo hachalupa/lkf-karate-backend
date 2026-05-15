@@ -113,6 +113,7 @@ module.exports = {
         remainingSeconds,
         showResults: exam.showResults === true,
         questions: questionsForClient,
+        answers: existing.answers || {},
       });
     }
 
@@ -322,5 +323,34 @@ module.exports = {
       courseTitle: course.title,
       total: questionsForClient.length,
     });
+  },
+
+  async saveProgress(ctx) {
+    const user = ctx.state.user;
+    if (!user) return ctx.unauthorized();
+
+    const { attemptId, answers } = ctx.request.body;
+    if (!attemptId || !answers) {
+      return ctx.badRequest("attemptId and answers are required");
+    }
+
+    const attempt = await strapi.db
+      .query("api::exam-attempt.exam-attempt")
+      .findOne({
+        where: { id: attemptId, user: user.id },
+      });
+
+    if (!attempt) return ctx.notFound("Attempt not found");
+    if (attempt.submittedAt) return ctx.badRequest("Attempt already submitted");
+
+    const currentAnswers = attempt.answers || {};
+    const mergedAnswers = { ...currentAnswers, ...answers };
+
+    await strapi.db.query("api::exam-attempt.exam-attempt").update({
+      where: { id: attemptId },
+      data: { answers: mergedAnswers },
+    });
+
+    return ctx.send({ ok: true, answers: mergedAnswers });
   },
 };
