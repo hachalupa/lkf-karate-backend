@@ -114,6 +114,7 @@ module.exports = {
         showResults: exam.showResults === true,
         questions: questionsForClient,
         answers: existing.answers || {},
+        examTitle: exam.title,
       });
     }
 
@@ -184,11 +185,13 @@ module.exports = {
     }
 
     return ctx.send({
-      attemptId: attempt.id,
+      attemptId: existing.id,
       duration: exam.duration,
       remainingSeconds,
-      showResults: exam.showResults ?? true,
+      showResults: exam.showResults === true,
       questions: questionsForClient,
+      answers: existing.answers || {},
+      examTitle: exam.title,
     });
   },
 
