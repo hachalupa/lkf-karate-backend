@@ -185,12 +185,12 @@ module.exports = {
     }
 
     return ctx.send({
-      attemptId: existing.id,
+      attemptId: attempt.id,
       duration: exam.duration,
       remainingSeconds,
       showResults: exam.showResults === true,
       questions: questionsForClient,
-      answers: existing.answers || {},
+      answers: attempt.answers || {},
       examTitle: exam.title,
     });
   },
