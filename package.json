@@ -16,10 +16,11 @@
     "upgrade:dry": "npx @strapi/upgrade latest --dry"
   },
   "dependencies": {
-    "@strapi/plugin-cloud": "5.39.0",
-    "@strapi/plugin-users-permissions": "5.39.0",
+    "@fourlights/strapi-plugin-deep-populate": "^1.15.0",
+    "@strapi/plugin-cloud": "5.46.0",
+    "@strapi/plugin-users-permissions": "5.46.0",
     "@strapi/provider-email-nodemailer": "^5.40.0",
-    "@strapi/strapi": "5.39.0",
+    "@strapi/strapi": "5.46.0",
     "better-sqlite3": "12.6.2",
     "fs-extra": "^10.0.0",
     "mime-types": "^2.1.27",

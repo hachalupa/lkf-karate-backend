@@ -1,267 +1,359 @@
-'use strict'
+"use strict";
 
 module.exports = {
   async start(ctx) {
-    const user = ctx.state.user
+    const user = ctx.state.user;
 
     if (!user) {
-      return ctx.unauthorized('You must be logged in')
+      return ctx.unauthorized("You must be logged in");
     }
 
-    const { examId } = ctx.request.body
+    const { examId } = ctx.request.body;
 
     if (!examId) {
-      return ctx.badRequest('examId is required')
+      return ctx.badRequest("examId is required");
     }
 
     // Find the exam
-    const exam = await strapi.documents('api::exam.exam').findOne({
+    const exam = await strapi.documents("api::exam.exam").findOne({
       documentId: examId,
-      populate: ['course'],
-    })
+      populate: ["course"],
+    });
 
     if (!exam) {
-      return ctx.notFound('Exam not found')
+      return ctx.notFound("Exam not found");
     }
 
     // Check if exam is open
-    const now = new Date()
+    const now = new Date();
     if (exam.openAt && new Date(exam.openAt) > now) {
-      return ctx.badRequest('Exam has not started yet')
+      return ctx.badRequest("Exam has not started yet");
     }
     if (exam.closeAt && new Date(exam.closeAt) < now) {
-      return ctx.badRequest('Exam has closed')
+      return ctx.badRequest("Exam has closed");
+    }
+
+    // Check if user already has a submitted attempt
+    const submittedAttempt = await strapi.db
+      .query("api::exam-attempt.exam-attempt")
+      .findOne({
+        where: {
+          exam: exam.id,
+          user: user.id,
+          submittedAt: { $notNull: true },
+        },
+        orderBy: { submittedAt: "desc" },
+      });
+
+    if (submittedAttempt) {
+      return ctx.badRequest("You have already completed this exam");
     }
 
     // Check if user already has an active attempt
-    const existing = await strapi.db.query('api::exam-attempt.exam-attempt').findOne({
-      where: {
-        exam: exam.id,
-        user: user.id,
-        submittedAt: null,
-      },
-    })
+    const existing = await strapi.db
+      .query("api::exam-attempt.exam-attempt")
+      .findOne({
+        where: {
+          exam: exam.id,
+          user: user.id,
+          submittedAt: null,
+        },
+        orderBy: { startedAt: "desc" },
+      });
 
     if (existing) {
-  const now = new Date()
-  let remainingSeconds = exam.duration * 60
+      const now = new Date();
+      let remainingSeconds = exam.duration * 60;
 
-  const startedAt = new Date(existing.startedAt)
-  const secondsSinceStart = Math.floor((Number(now) - Number(startedAt)) / 1000)
-  remainingSeconds = Math.max(0, exam.duration * 60 - secondsSinceStart)
+      const startedAt = new Date(existing.startedAt);
+      const secondsSinceStart = Math.floor(
+        (Number(now) - Number(startedAt)) / 1000,
+      );
+      remainingSeconds = Math.max(0, exam.duration * 60 - secondsSinceStart);
 
-  if (exam.closeAt) {
-    const closeAt = new Date(exam.closeAt)
-    const secondsUntilClose = Math.floor((Number(closeAt) - Number(now)) / 1000)
-    remainingSeconds = Math.min(remainingSeconds, secondsUntilClose)
-  }
+      if (exam.closeAt) {
+        const closeAt = new Date(exam.closeAt);
+        const secondsUntilClose = Math.floor(
+          (Number(closeAt) - Number(now)) / 1000,
+        );
+        remainingSeconds = Math.min(remainingSeconds, secondsUntilClose);
+      }
 
-  // Re-fetch questions with media
-  const questionIds = existing.questions.map(q => q.id)
-  const questionsWithMedia = await strapi.db.query('api::question.question').findMany({
-    where: { id: { $in: questionIds } },
-    populate: ['media'],
-  })
+      // Re-fetch questions with media
+      const questionIds = existing.questions.map((q) => q.id);
+      const questionsWithMedia = await strapi.db
+        .query("api::question.question")
+        .findMany({
+          where: { id: { $in: questionIds } },
+          populate: ["media"],
+        });
 
-  // Preserve original question order
-  const questionsMap = {}
-  questionsWithMedia.forEach(q => { questionsMap[q.id] = q })
-  const orderedQuestions = existing.questions.map(q => questionsMap[q.id] || q)
+      // Preserve original question order
+      const questionsMap = {};
+      questionsWithMedia.forEach((q) => {
+        questionsMap[q.id] = q;
+      });
+      const orderedQuestions = existing.questions.map(
+        (q) => questionsMap[q.id] || q,
+      );
 
-  const questionsForClient = orderedQuestions.map(q => ({
-    id: q.id,
-    documentId: q.documentId,
-    text: q.text || q.textLv || q.textEn || q.textRu || '',
-    textLv: q.textLv || '',
-    textRu: q.textRu || '',
-    textEn: q.textEn || '',
-    type: q.type,
-    options: q.options || ['true', 'false'],
-    media: q.media,
-    correctAnswer: q.correctAnswer,
-  }))
+      const questionsForClient = orderedQuestions.map((q) => ({
+        id: q.id,
+        documentId: q.documentId,
+        text: q.text || q.textLv || q.textEn || q.textRu || "",
+        type: q.type,
+        options: q.options || ["true", "false"],
+        media: q.media,
+        correctAnswer: q.correctAnswer,
+      }));
 
-  return ctx.send({
-    attemptId: existing.id,
-    duration: exam.duration,
-    remainingSeconds,
-    showResults: exam.showResults === true,
-    questions: questionsForClient,
-  })
-}
+      return ctx.send({
+        attemptId: existing.id,
+        duration: exam.duration,
+        remainingSeconds,
+        showResults: exam.showResults === true,
+        questions: questionsForClient,
+        answers: existing.answers || {},
+        examTitle: exam.title,
+      });
+    }
 
     // Get exam with selected questions
-    const examWithQuestions = await strapi.documents('api::exam.exam').findOne({
+    const examWithQuestions = await strapi.documents("api::exam.exam").findOne({
       documentId: examId,
-      populate: ['course', 'questions', 'questions.media'],
-    })
+      populate: ["course", "questions", "questions.media"],
+    });
 
-    let selected = []
+    let selected = [];
 
     if (examWithQuestions.questions && examWithQuestions.questions.length > 0) {
       // Use admin-selected questions, shuffle them
-      selected = examWithQuestions.questions.sort(() => Math.random() - 0.5)
+      selected = examWithQuestions.questions.sort(() => Math.random() - 0.5);
     } else {
       // Fallback to random from course pool
-      const allQuestions = await strapi.db.query('api::question.question').findMany({
-        where: { course: exam.course.id },
-        populate: ['media'],
-      })
+      const allQuestions = await strapi.db
+        .query("api::question.question")
+        .findMany({
+          where: { course: exam.course.id },
+          populate: ["media"],
+        });
       if (allQuestions.length === 0) {
-        return ctx.badRequest('No questions available for this exam')
+        return ctx.badRequest("No questions available for this exam");
       }
-      const count = Math.min(exam.questionCount || 10, allQuestions.length)
-      selected = allQuestions.sort(() => Math.random() - 0.5).slice(0, count)
+      const count = Math.min(exam.questionCount || 10, allQuestions.length);
+      selected = allQuestions.sort(() => Math.random() - 0.5).slice(0, count);
     }
 
     if (selected.length === 0) {
-      return ctx.badRequest('No questions available for this exam')
+      return ctx.badRequest("No questions available for this exam");
     }
 
     // Strip correct answers before sending to client
-    const questionsForClient = selected.map(q => ({
+    const questionsForClient = selected.map((q) => ({
       id: q.id,
       documentId: q.documentId,
       text: q.text,
       type: q.type,
       options: q.options,
       media: q.media,
-    }))
+    }));
 
     // Store full questions (with answers) in the attempt
-    const attempt = await strapi.db.query('api::exam-attempt.exam-attempt').create({
-      data: {
-        exam: exam.id,
-        user: user.id,
-        startedAt: new Date(),
-        questions: selected,
-        answers: {},
-        publishedAt: new Date(),
-      },
-    })
+    const attempt = await strapi.db
+      .query("api::exam-attempt.exam-attempt")
+      .create({
+        data: {
+          exam: exam.id,
+          user: user.id,
+          startedAt: new Date(),
+          questions: selected,
+          answers: {},
+          publishedAt: new Date(),
+        },
+      });
 
     // Calculate remaining time
-    let remainingSeconds = exam.duration * 60
+    let remainingSeconds = exam.duration * 60;
 
-      if (exam.closeAt) {
-        const now = new Date()
-        const closeAt = new Date(exam.closeAt)
-        const secondsUntilClose = Math.floor((Number(closeAt) - Number(now)) / 1000)
-        remainingSeconds = Math.min(remainingSeconds, secondsUntilClose)
-      }
+    if (exam.closeAt) {
+      const now = new Date();
+      const closeAt = new Date(exam.closeAt);
+      const secondsUntilClose = Math.floor(
+        (Number(closeAt) - Number(now)) / 1000,
+      );
+      remainingSeconds = Math.min(remainingSeconds, secondsUntilClose);
+    }
 
-      return ctx.send({
-        attemptId: attempt.id,
-        duration: exam.duration,
-        remainingSeconds,
-        showResults: exam.showResults ?? true,
-        questions: questionsForClient,
-      })
+    return ctx.send({
+      attemptId: attempt.id,
+      duration: exam.duration,
+      remainingSeconds,
+      showResults: exam.showResults === true,
+      questions: questionsForClient,
+      answers: attempt.answers || {},
+      examTitle: exam.title,
+    });
   },
 
   async submit(ctx) {
-    const user = ctx.state.user
-    if (!user) return ctx.unauthorized()
+    const user = ctx.state.user;
+    if (!user) return ctx.unauthorized();
 
-    const { attemptId, answers } = ctx.request.body
+    const { attemptId, answers } = ctx.request.body;
     if (!attemptId || !answers) {
-      return ctx.badRequest('attemptId and answers are required')
+      return ctx.badRequest("attemptId and answers are required");
     }
 
     // Find the attempt
-    const attempt = await strapi.db.query('api::exam-attempt.exam-attempt').findOne({
-      where: { id: attemptId, user: user.id },
-      populate: ['exam'],
-    })
+    const attempt = await strapi.db
+      .query("api::exam-attempt.exam-attempt")
+      .findOne({
+        where: { id: attemptId, user: user.id },
+        populate: ["exam"],
+      });
 
-    if (!attempt) return ctx.notFound('Attempt not found')
-    if (attempt.submittedAt) return ctx.badRequest('Attempt already submitted')
+    if (!attempt) return ctx.notFound("Attempt not found");
+    if (attempt.submittedAt) return ctx.badRequest("Attempt already submitted");
 
     // Get exam directly using documentId from populated relation
-    const examData = attempt.exam
-    const passingScore = examData?.passingScore || 70
-    const showResults = examData?.showResults === true
+    const examData = attempt.exam;
+    const passingScore = examData?.passingScore || 70;
+    const showResults = examData?.showResults === true;
 
-    // Grade
-    const questions = attempt.questions
-    let correct = 0
-    questions.forEach(q => {
-      const userAnswer = answers[q.id]
-      if (userAnswer !== undefined && userAnswer !== null && q.correctAnswer) {
-        if (String(userAnswer).toLowerCase() === String(q.correctAnswer).toLowerCase()) {
-          correct++
-        }
-      }
-    })
+    const questions = attempt.questions || [];
 
-    const score = Math.round((correct / questions.length) * 100)
-    const passed = score >= passingScore
+    const unanswered = questions.filter((q) => {
+      const userAnswer = answers[q.id];
+      return (
+        userAnswer === undefined ||
+        userAnswer === null ||
+        String(userAnswer).trim() === ""
+      );
+    });
 
-    await strapi.db.query('api::exam-attempt.exam-attempt').update({
-      where: { id: attemptId },
-      data: { answers, score, passed, submittedAt: new Date() },
-    })
-
-    console.log('EXAM DATA:', examData)
-    console.log('SHOW RESULTS:', showResults)
-    
-    return ctx.send({ 
-      score, 
-      passed, 
-      correct, 
-      total: questions.length, 
-      showResults,
-      resultsReleased: examData?.resultsReleased === true,
-    })
-},
-
-  async quickQuiz(ctx) {
-    const user = ctx.state.user
-    if (!user) return ctx.unauthorized()
-    
-    const { courseDocumentId, count } = ctx.request.body
-    if (!courseDocumentId) return ctx.badRequest('courseDocumentId is required')
-
-    const course = await strapi.documents('api::course.course').findOne({
-      documentId: courseDocumentId,
-    })
-
-    if (!course) return ctx.notFound('Course not found')
-
-    const allQuestions = await strapi.db.query('api::question.question').findMany({
-      where: { course: course.id },
-      populate: ['media'],
-    })
-    console.log('Questions from DB:', allQuestions.map(q => ({ id: q.id, text: q.text.slice(0, 20), correctAnswer: q.correctAnswer })))
-    console.log('First question full object:', JSON.stringify(allQuestions[0]))
-    if (allQuestions.length === 0) {
-      return ctx.badRequest('No questions available for this course')
+    if (unanswered.length > 0) {
+      return ctx.badRequest(
+        `Please answer all questions before submitting. ${unanswered.length} unanswered.`,
+      );
     }
 
-    const questionCount = count === 'all'
-      ? allQuestions.length
-      : Math.min(Number(count) || 10, allQuestions.length)
+    let correct = 0;
+    questions.forEach((q) => {
+      const userAnswer = answers[q.id];
+      if (q.correctAnswer !== undefined && q.correctAnswer !== null) {
+        if (
+          String(userAnswer).toLowerCase() ===
+          String(q.correctAnswer).toLowerCase()
+        ) {
+          correct++;
+        }
+      }
+    });
 
-    const shuffled = allQuestions.sort(() => Math.random() - 0.5)
-    const selected = shuffled.slice(0, questionCount)
+    const score = Math.round((correct / questions.length) * 100);
+    const passed = score >= passingScore;
 
-    const questionsForClient = selected.map(q => ({
+    await strapi.db.query("api::exam-attempt.exam-attempt").update({
+      where: { id: attemptId },
+      data: { answers, score, passed, submittedAt: new Date() },
+    });
+
+    console.log("EXAM DATA:", examData);
+    console.log("SHOW RESULTS:", showResults);
+
+    return ctx.send({
+      score,
+      passed,
+      correct,
+      total: questions.length,
+      showResults,
+    });
+  },
+
+  async quickQuiz(ctx) {
+    const user = ctx.state.user;
+    if (!user) return ctx.unauthorized();
+
+    const { courseDocumentId, count } = ctx.request.body;
+    if (!courseDocumentId)
+      return ctx.badRequest("courseDocumentId is required");
+
+    const course = await strapi.documents("api::course.course").findOne({
+      documentId: courseDocumentId,
+    });
+
+    if (!course) return ctx.notFound("Course not found");
+
+    const allQuestions = await strapi.db
+      .query("api::question.question")
+      .findMany({
+        where: { course: course.id },
+        populate: ["media"],
+      });
+    console.log(
+      "Questions from DB:",
+      allQuestions.map((q) => ({
+        id: q.id,
+        text: q.text.slice(0, 20),
+        correctAnswer: q.correctAnswer,
+      })),
+    );
+    console.log("First question full object:", JSON.stringify(allQuestions[0]));
+    if (allQuestions.length === 0) {
+      return ctx.badRequest("No questions available for this course");
+    }
+
+    const questionCount =
+      count === "all"
+        ? allQuestions.length
+        : Math.min(Number(count) || 10, allQuestions.length);
+
+    const shuffled = allQuestions.sort(() => Math.random() - 0.5);
+    const selected = shuffled.slice(0, questionCount);
+
+    const questionsForClient = selected.map((q) => ({
       id: q.id,
       documentId: q.documentId,
-      text: q.text || q.textLv || q.textEn || q.textRu || '',
-      textLv: q.textLv || '',
-      textRu: q.textRu || '',
-      textEn: q.textEn || '',
+      text: q.text || q.textLv || q.textEn || q.textRu || "",
       type: q.type,
-      options: q.options || ['true', 'false'],
+      options: q.options || ["true", "false"],
       media: q.media,
       correctAnswer: q.correctAnswer,
-    }))
+    }));
 
     return ctx.send({
       questions: questionsForClient,
       courseTitle: course.title,
       total: questionsForClient.length,
-    })
+    });
   },
-}
+
+  async saveProgress(ctx) {
+    const user = ctx.state.user;
+    if (!user) return ctx.unauthorized();
+
+    const { attemptId, answers } = ctx.request.body;
+    if (!attemptId || !answers) {
+      return ctx.badRequest("attemptId and answers are required");
+    }
+
+    const attempt = await strapi.db
+      .query("api::exam-attempt.exam-attempt")
+      .findOne({
+        where: { id: attemptId, user: user.id },
+      });
+
+    if (!attempt) return ctx.notFound("Attempt not found");
+    if (attempt.submittedAt) return ctx.badRequest("Attempt already submitted");
+
+    const currentAnswers = attempt.answers || {};
+    const mergedAnswers = { ...currentAnswers, ...answers };
+
+    await strapi.db.query("api::exam-attempt.exam-attempt").update({
+      where: { id: attemptId },
+      data: { answers: mergedAnswers },
+    });
+
+    return ctx.send({ ok: true, answers: mergedAnswers });
+  },
+};

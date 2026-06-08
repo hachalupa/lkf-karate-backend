@@ -44,9 +44,6 @@
     "showResults": {
       "type": "boolean"
     },
-    "resultsReleased": {
-      "type": "boolean"
-    },
     "questions": {
       "type": "relation",
       "relation": "manyToMany",
