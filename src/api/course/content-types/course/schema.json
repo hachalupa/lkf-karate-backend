@@ -49,6 +49,12 @@
     },
     "slug": {
       "type": "string"
+    },
+    "exam_attempts": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::exam-attempt.exam-attempt",
+      "mappedBy": "course"
     }
   }
 }

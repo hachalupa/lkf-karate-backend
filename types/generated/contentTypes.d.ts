@@ -536,6 +536,10 @@ export interface ApiCourseCourse extends Struct.CollectionTypeSchema {
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     description: Schema.Attribute.Text;
+    exam_attempts: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::exam-attempt.exam-attempt'
+    >;
     exams: Schema.Attribute.Relation<'oneToMany', 'api::exam.exam'>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
@@ -566,6 +570,7 @@ export interface ApiExamAttemptExamAttempt extends Struct.CollectionTypeSchema {
   };
   attributes: {
     answers: Schema.Attribute.JSON;
+    course: Schema.Attribute.Relation<'manyToOne', 'api::course.course'>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -582,6 +587,7 @@ export interface ApiExamAttemptExamAttempt extends Struct.CollectionTypeSchema {
     score: Schema.Attribute.Integer;
     startedAt: Schema.Attribute.DateTime;
     submittedAt: Schema.Attribute.DateTime;
+    timeSpentSeconds: Schema.Attribute.Integer;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;

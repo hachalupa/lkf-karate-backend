@@ -12,7 +12,7 @@ module.exports = createCoreController(
         .query("api::exam-attempt.exam-attempt")
         .findMany({
           where: { user: user.id },
-          populate: ["exam"],
+          populate: ["exam", "course"],
           orderBy: { createdAt: "desc" },
         });
       return ctx.send({ data: attempts });
@@ -31,7 +31,7 @@ module.exports = createCoreController(
         .query("api::exam-attempt.exam-attempt")
         .findMany({
           where: {},
-          populate: ["exam", "user"],
+          populate: ["exam", "course", "user"],
           orderBy: { createdAt: "desc" },
         });
       return ctx.send({ data: attempts });

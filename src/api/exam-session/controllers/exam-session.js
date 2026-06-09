@@ -19,7 +19,7 @@ module.exports = {
       documentId: examId,
       populate: ["course"],
     });
-
+    
     if (!exam) {
       return ctx.notFound("Exam not found");
     }
@@ -209,7 +209,7 @@ module.exports = {
       .query("api::exam-attempt.exam-attempt")
       .findOne({
         where: { id: attemptId, user: user.id },
-        populate: ["exam"],
+        populate: ["exam", "course"],
       });
 
     if (!attempt) return ctx.notFound("Attempt not found");
@@ -217,6 +217,9 @@ module.exports = {
 
     // Get exam directly using documentId from populated relation
     const examData = attempt.exam;
+    const courseData = attempt.course;
+    const isQuickQuiz = !examData && !!courseData;
+
     const passingScore = examData?.passingScore || 70;
     const showResults = examData?.showResults === true;
 
@@ -251,11 +254,22 @@ module.exports = {
     });
 
     const score = Math.round((correct / questions.length) * 100);
-    const passed = score >= passingScore;
+    const passed = isQuickQuiz ? null : score >= passingScore;
+
+    const submittedAt = new Date();
+    const startedAt = attempt.startedAt ? new Date(attempt.startedAt) : null;
+    const timeSpentSeconds =
+      startedAt ? Math.max(0, Math.floor((submittedAt - startedAt) / 1000)) : null;
 
     await strapi.db.query("api::exam-attempt.exam-attempt").update({
       where: { id: attemptId },
-      data: { answers, score, passed, submittedAt: new Date() },
+      data: {
+        answers,
+        score,
+        passed,
+        submittedAt,
+        timeSpentSeconds,
+      },
     });
 
     console.log("EXAM DATA:", examData);
@@ -267,6 +281,9 @@ module.exports = {
       correct,
       total: questions.length,
       showResults,
+      timeSpentSeconds,
+      startedAt,
+      submittedAt,
     });
   },
 
@@ -321,10 +338,25 @@ module.exports = {
       correctAnswer: q.correctAnswer,
     }));
 
+    const attempt = await strapi.db
+      .query("api::exam-attempt.exam-attempt")
+      .create({
+        data: {
+          user: user.id,
+          course: course.id,
+          questions: selected,
+          answers: {},
+          startedAt: new Date(),
+          publishedAt: new Date(),
+        },
+      });
+
     return ctx.send({
+      attemptId: attempt.id,
       questions: questionsForClient,
       courseTitle: course.title,
       total: questionsForClient.length,
+      startedAt: attempt.startedAt,
     });
   },
 
