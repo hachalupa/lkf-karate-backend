@@ -606,7 +606,7 @@ export interface ApiExamExam extends Struct.CollectionTypeSchema {
     singularName: 'exam';
   };
   options: {
-    draftAndPublish: true;
+    draftAndPublish: false;
   };
   attributes: {
     closeAt: Schema.Attribute.DateTime;
