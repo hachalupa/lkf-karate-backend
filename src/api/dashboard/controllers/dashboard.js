@@ -7,56 +7,77 @@ module.exports = {
     if (!user) return ctx.unauthorized()
 
     const now = new Date()
+
     const days30Ago = new Date(now)
     days30Ago.setDate(days30Ago.getDate() - 30)
 
-    // 1) Last results (exams + quick quizzes) – latest 3 submitted
-    const lastResults = await strapi.db.query('api::exam-attempt.exam-attempt').findMany({
-      where: {
-        user: user.id,
-        submittedAt: { $notNull: true },
-      },
-      orderBy: { submittedAt: 'desc' },
-      limit: 3,
-      populate: ['exam', 'course'],
-    })
+    const days360Ago = new Date(now)
+    days360Ago.setDate(days360Ago.getDate() - 360)
 
-    // 2) Stats over last 30 days (you can change to 90 later if you want)
-    const recentAttempts = await strapi.db.query('api::exam-attempt.exam-attempt').findMany({
-      where: {
-        user: user.id,
-        submittedAt: { $notNull: true, $gte: days30Ago },
-      },
-      populate: ['exam', 'course'],
-    })
+    // 1) Last results – latest 3 submitted (all time)
+    const lastResults = await strapi.db
+      .query('api::exam-attempt.exam-attempt')
+      .findMany({
+        where: {
+          user: user.id,
+          submittedAt: { $notNull: true },
+        },
+        orderBy: { submittedAt: 'desc' },
+        limit: 3,
+        populate: ['exam', 'course'],
+      })
 
-    let quizCount = 0
+    // 2a) Quiz count – last 30 days
+    const recentQuizAttempts = await strapi.db
+      .query('api::exam-attempt.exam-attempt')
+      .findMany({
+        where: {
+          user: user.id,
+          submittedAt: { $notNull: true, $gte: days30Ago },
+          course: { $notNull: true },
+          exam: null,
+        },
+      })
+
+    const quizCount = recentQuizAttempts.length
+
+    // 2b) Exam stats – last 360 days
+    const recentExamAttempts = await strapi.db
+      .query('api::exam-attempt.exam-attempt')
+      .findMany({
+        where: {
+          user: user.id,
+          submittedAt: { $notNull: true, $gte: days360Ago },
+          exam: { $notNull: true },
+        },
+      })
+
+    let examCount = 0
     let completedExams = 0
-    let studySeconds = 0
-    // completedChapters: 0 for now unless you track it elsewhere
-    let completedChapters = 0
 
-    for (const a of recentAttempts) {
-      const isQuickQuiz = !!a.course && !a.exam
-      const isExam = !!a.exam
-      if (isQuickQuiz) quizCount += 1
-      if (isExam && a.passed === true) completedExams += 1
-      if (a.timeSpentSeconds) studySeconds += a.timeSpentSeconds
+    for (const a of recentExamAttempts) {
+      examCount += 1                   // all submitted exams in 360 days
+      if (a.passed === true) {
+        completedExams += 1            // passed exams in 360 days
+      }
     }
 
-    const studyHours = Number((studySeconds / 3600).toFixed(1))
+    // 2c) Study hours – placeholder for now
+    const studyHours = 0
 
-    // 3) Upcoming exam (nearest openAt in future that user can take)
-    const upcoming = await strapi.documents('api::exam.exam').findMany({
-      where: {
-        openAt: { $gt: now },
-        // add any extra filters (e.g. published, allowed roles)
-      },
-      orderBy: { openAt: 'asc' },
-      limit: 1,
-    })
+    // 3) Upcoming exam (nearest openAt in future)
+    const upcoming = await strapi
+      .documents('api::exam.exam')
+      .findMany({
+        where: {
+          openAt: { $gt: now },
+        },
+        orderBy: { openAt: 'asc' },
+        limit: 1,
+      })
 
     let upcomingExam = null
+
     if (upcoming && upcoming.length > 0) {
       const exam = upcoming[0]
       const openAt = new Date(exam.openAt)
@@ -78,7 +99,7 @@ module.exports = {
       }
     }
 
-    // 4) Greeting can be done on frontend, but you can send it if you like
+    // 4) Greeting
     let greeting = null
     const hour = now.getHours()
     if (hour < 12) greeting = 'Good morning'
@@ -88,10 +109,10 @@ module.exports = {
     return ctx.send({
       greeting,
       stats: {
-        quizCount,
-        studyHours,
-        completedChapters,
-        completedExams,
+        quizCount,        // last 30 days
+        examCount,        // last 360 days
+        studyHours,       // 0 for now
+        completedExams,   // passed in last 360 days
       },
       lastResults,
       upcomingExam,
