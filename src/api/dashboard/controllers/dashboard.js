@@ -66,6 +66,7 @@ module.exports = {
     const studyHours = 0
 
     // 3) Upcoming exam (nearest openAt in future)
+    
     const upcoming = await strapi
       .documents('api::exam.exam')
       .findMany({
@@ -74,6 +75,7 @@ module.exports = {
         },
         orderBy: { openAt: 'asc' },
         limit: 1,
+        populate: ['course', 'questions'],   // add this
       })
 
     let upcomingExam = null
@@ -96,6 +98,9 @@ module.exports = {
         documentId: exam.documentId,
         title: exam.title,
         opensInHuman: parts.join(' ') || 'soon',
+        courseTitle: exam.course?.title || null,
+        questionCount: exam.questions?.length || 0,
+        passingScore: exam.passingScore ?? null,   // adjust field name to match your schema
       }
     }
 

@@ -97,6 +97,14 @@
       "relation": "oneToMany",
       "target": "api::chapter-progress.chapter-progress",
       "mappedBy": "users_permissions_user"
+    },
+    "profilePicture": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": [
+        "images",
+        "files"
+      ]
     }
   }
 }
