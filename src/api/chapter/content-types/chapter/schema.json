@@ -11,7 +11,7 @@
   },
   "pluginOptions": {},
   "attributes": {
-    "title": {
+    "titleLv": {
       "type": "string"
     },
     "order": {
@@ -43,16 +43,38 @@
       "multiple": true,
       "allowedTypes": [
         "images",
-        "files",
-        "videos",
-        "audios"
+        "videos"
       ]
     },
-    "content": {
-      "type": "text"
-    },
-    "blocks": {
+    "blocksLv": {
       "type": "json"
+    },
+    "titleRu": {
+      "type": "string"
+    },
+    "titleEn": {
+      "type": "string"
+    },
+    "blocksEn": {
+      "type": "json"
+    },
+    "blocksRu": {
+      "type": "json"
+    },
+    "baseLanguage": {
+      "type": "enumeration",
+      "enum": [
+        "ru",
+        "lv",
+        "en"
+      ]
+    },
+    "sourceMode": {
+      "type": "enumeration",
+      "enum": [
+        "manual",
+        "pdf"
+      ]
     }
   }
 }

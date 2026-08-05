@@ -102,8 +102,54 @@
       "type": "media",
       "multiple": false,
       "allowedTypes": [
-        "images",
-        "files"
+        "images"
+      ]
+    },
+    "country": {
+      "type": "enumeration",
+      "enum": [
+        "Latvia"
+      ]
+    },
+    "phoneNumber": {
+      "type": "string"
+    },
+    "birthday": {
+      "type": "date"
+    },
+    "rank": {
+      "type": "string"
+    },
+    "language": {
+      "type": "enumeration",
+      "enum": [
+        "lv",
+        "ru",
+        "en"
+      ]
+    },
+    "themePreference": {
+      "type": "enumeration",
+      "enum": [
+        "light",
+        "dark",
+        "system"
+      ]
+    },
+    "clubName": {
+      "type": "enumeration",
+      "enum": [
+        "Leonīda Vasiļjeva Karatē skola",
+        "Latvijas Godžju-rju Karatē Federācija",
+        "Fudzi Sporta Klubs",
+        "Salaspils Karatē Klubs",
+        "Tan",
+        "Rīgas Karatē Klubs",
+        "Ippon.lv",
+        "Bolderājas Karatē klubs",
+        "Daugavpils karatē skola",
+        "Sochin Karate Klub",
+        "Ruslana Sadikova sporta skola"
       ]
     }
   }

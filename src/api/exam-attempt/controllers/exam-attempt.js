@@ -15,7 +15,42 @@ module.exports = createCoreController(
           populate: ["exam", "course"],
           orderBy: { createdAt: "desc" },
         });
-      return ctx.send({ data: attempts });
+
+      // Strip score data from unreleased exam results
+      const sanitized = attempts.map((a) => {
+        const isExam = !!a.exam;
+        const showResults = isExam && a.exam?.showResults === true;
+        if (!showResults && isExam) {
+          const { score, passed, answers, questions, ...rest } = a;
+          return { ...rest, score: null, passed: null, answers: null, questions: null };
+        }
+        return a;
+      });
+
+      return ctx.send({ data: sanitized });
+    },
+
+    async findOne(ctx) {
+      const user = ctx.state.user;
+      if (!user) return ctx.unauthorized();
+
+      const { id } = ctx.params;
+
+      const attempt = await strapi.db
+        .query("api::exam-attempt.exam-attempt")
+        .findOne({
+          where: { id },
+          populate: ["exam", "course", "user"],
+        });
+
+      if (!attempt) return ctx.notFound("Attempt not found");
+
+      // Enforce ownership — users can only view their own attempts
+      if (attempt.user?.id !== user.id) {
+        return ctx.forbidden("You can only view your own attempts");
+      }
+
+      return ctx.send({ data: attempt });
     },
 
     async findAll(ctx) {

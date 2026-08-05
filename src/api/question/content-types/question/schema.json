@@ -22,7 +22,7 @@
         "open_text"
       ]
     },
-    "options": {
+    "optionsLv": {
       "type": "json"
     },
     "correctAnswer": {
@@ -45,9 +45,7 @@
       "multiple": true,
       "allowedTypes": [
         "images",
-        "files",
-        "videos",
-        "audios"
+        "videos"
       ]
     },
     "exams": {
@@ -68,11 +66,24 @@
     "sourceFile": {
       "type": "string"
     },
-    "text": {
-      "type": "text"
-    },
     "order": {
       "type": "integer"
+    },
+    "showInChapter": {
+      "type": "boolean"
+    },
+    "optionsRu": {
+      "type": "json"
+    },
+    "optionsEn": {
+      "type": "json"
+    },
+    "sourceMode": {
+      "type": "enumeration",
+      "enum": [
+        "manual",
+        "pdf"
+      ]
     }
   }
 }

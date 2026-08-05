@@ -11,10 +11,10 @@
   },
   "pluginOptions": {},
   "attributes": {
-    "title": {
+    "titleLv": {
       "type": "string"
     },
-    "description": {
+    "descriptionLv": {
       "type": "text"
     },
     "category": {
@@ -25,9 +25,6 @@
         "secretary",
         "seminar"
       ]
-    },
-    "published": {
-      "type": "boolean"
     },
     "questions": {
       "type": "relation",
@@ -55,6 +52,18 @@
       "relation": "oneToMany",
       "target": "api::exam-attempt.exam-attempt",
       "mappedBy": "course"
+    },
+    "titleRu": {
+      "type": "string"
+    },
+    "titleEn": {
+      "type": "string"
+    },
+    "descriptionRu": {
+      "type": "text"
+    },
+    "descriptionEn": {
+      "type": "text"
     }
   }
 }

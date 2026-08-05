@@ -486,12 +486,14 @@ export interface ApiChapterChapter extends Struct.CollectionTypeSchema {
     draftAndPublish: true;
   };
   attributes: {
-    blocks: Schema.Attribute.JSON;
+    baseLanguage: Schema.Attribute.Enumeration<['ru', 'lv', 'en']>;
+    blocksEn: Schema.Attribute.JSON;
+    blocksLv: Schema.Attribute.JSON;
+    blocksRu: Schema.Attribute.JSON;
     chapter_progresses: Schema.Attribute.Relation<
       'oneToMany',
       'api::chapter-progress.chapter-progress'
     >;
-    content: Schema.Attribute.Text;
     course: Schema.Attribute.Relation<'manyToOne', 'api::course.course'>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -502,14 +504,14 @@ export interface ApiChapterChapter extends Struct.CollectionTypeSchema {
       'api::chapter.chapter'
     > &
       Schema.Attribute.Private;
-    media: Schema.Attribute.Media<
-      'images' | 'files' | 'videos' | 'audios',
-      true
-    >;
+    media: Schema.Attribute.Media<'images' | 'videos', true>;
     order: Schema.Attribute.Integer;
     publishedAt: Schema.Attribute.DateTime;
     questions: Schema.Attribute.Relation<'oneToMany', 'api::question.question'>;
-    title: Schema.Attribute.String;
+    sourceMode: Schema.Attribute.Enumeration<['manual', 'pdf']>;
+    titleEn: Schema.Attribute.String;
+    titleLv: Schema.Attribute.String;
+    titleRu: Schema.Attribute.String;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -535,7 +537,9 @@ export interface ApiCourseCourse extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-    description: Schema.Attribute.Text;
+    descriptionEn: Schema.Attribute.Text;
+    descriptionLv: Schema.Attribute.Text;
+    descriptionRu: Schema.Attribute.Text;
     exam_attempts: Schema.Attribute.Relation<
       'oneToMany',
       'api::exam-attempt.exam-attempt'
@@ -547,11 +551,12 @@ export interface ApiCourseCourse extends Struct.CollectionTypeSchema {
       'api::course.course'
     > &
       Schema.Attribute.Private;
-    published: Schema.Attribute.Boolean;
     publishedAt: Schema.Attribute.DateTime;
     questions: Schema.Attribute.Relation<'oneToMany', 'api::question.question'>;
     slug: Schema.Attribute.String;
-    title: Schema.Attribute.String;
+    titleEn: Schema.Attribute.String;
+    titleLv: Schema.Attribute.String;
+    titleRu: Schema.Attribute.String;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -662,16 +667,16 @@ export interface ApiQuestionQuestion extends Struct.CollectionTypeSchema {
       'api::question.question'
     > &
       Schema.Attribute.Private;
-    media: Schema.Attribute.Media<
-      'images' | 'files' | 'videos' | 'audios',
-      true
-    >;
-    options: Schema.Attribute.JSON;
+    media: Schema.Attribute.Media<'images' | 'videos', true>;
+    optionsEn: Schema.Attribute.JSON;
+    optionsLv: Schema.Attribute.JSON;
+    optionsRu: Schema.Attribute.JSON;
     order: Schema.Attribute.Integer;
     publishedAt: Schema.Attribute.DateTime;
+    showInChapter: Schema.Attribute.Boolean;
     sourceFile: Schema.Attribute.String;
     sourceLang: Schema.Attribute.String;
-    text: Schema.Attribute.Text;
+    sourceMode: Schema.Attribute.Enumeration<['manual', 'pdf']>;
     textEn: Schema.Attribute.Text;
     textLv: Schema.Attribute.Text;
     textRu: Schema.Attribute.Text;
@@ -1182,13 +1187,30 @@ export interface PluginUsersPermissionsUser
     draftAndPublish: false;
   };
   attributes: {
+    birthday: Schema.Attribute.Date;
     blocked: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     chapter_progresses: Schema.Attribute.Relation<
       'oneToMany',
       'api::chapter-progress.chapter-progress'
     >;
+    clubName: Schema.Attribute.Enumeration<
+      [
+        'Leon\u012Bda Vasi\u013Cjeva Karat\u0113 skola',
+        'Latvijas God\u017Eju-rju Karat\u0113 Feder\u0101cija',
+        'Fudzi Sporta Klubs',
+        'Salaspils Karat\u0113 Klubs',
+        'Tan',
+        'R\u012Bgas Karat\u0113 Klubs',
+        'Ippon.lv',
+        'Bolder\u0101jas Karat\u0113 klubs',
+        'Daugavpils karat\u0113 skola',
+        'Sochin Karate Klub',
+        'Ruslana Sadikova sporta skola',
+      ]
+    >;
     confirmationToken: Schema.Attribute.String & Schema.Attribute.Private;
     confirmed: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    country: Schema.Attribute.Enumeration<['Latvia']>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -1203,6 +1225,7 @@ export interface PluginUsersPermissionsUser
     >;
     firstName: Schema.Attribute.String;
     isAdmin: Schema.Attribute.Boolean;
+    language: Schema.Attribute.Enumeration<['lv', 'ru', 'en']>;
     lastName: Schema.Attribute.String;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
@@ -1215,15 +1238,18 @@ export interface PluginUsersPermissionsUser
       Schema.Attribute.SetMinMaxLength<{
         minLength: 6;
       }>;
-    profilePicture: Schema.Attribute.Media<'images' | 'files'>;
+    phoneNumber: Schema.Attribute.String;
+    profilePicture: Schema.Attribute.Media<'images'>;
     provider: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
+    rank: Schema.Attribute.String;
     rejectionReason: Schema.Attribute.Text;
     resetPasswordToken: Schema.Attribute.String & Schema.Attribute.Private;
     role: Schema.Attribute.Relation<
       'manyToOne',
       'plugin::users-permissions.role'
     >;
+    themePreference: Schema.Attribute.Enumeration<['light', 'dark', 'system']>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;

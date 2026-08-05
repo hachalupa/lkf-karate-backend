@@ -23,7 +23,7 @@ module.exports = [
         "http://localhost:5174",
         "http://localhost:5173",
         "https://lkf-karate-frontend.vercel.app",
-        "https://lkf-karate-frontend-k6bqd6v1b-23dp1dbukos-projects.vercel.app",
+        ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
       ],
       methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
       headers: ["Content-Type", "Authorization", "Origin", "Accept"],

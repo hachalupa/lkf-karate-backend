@@ -7,10 +7,7 @@ module.exports = {
       method: 'GET',
       path: '/dashboard',
       handler: 'dashboard.user',
-      config: {
-        auth: {
-        },
-      },
+      config: { policies: [], middlewares: [] },
     },
   ],
 }

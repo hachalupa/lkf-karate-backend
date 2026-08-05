@@ -98,7 +98,7 @@ module.exports = {
         documentId: exam.documentId,
         title: exam.title,
         opensInHuman: parts.join(' ') || 'soon',
-        courseTitle: exam.course?.title || null,
+        courseTitle: exam.course?.title || exam.course?.titleLv || exam.course?.titleEn || exam.course?.titleRu || null,
         questionCount: exam.questions?.length || 0,
         passingScore: exam.passingScore ?? null,   // adjust field name to match your schema
       }

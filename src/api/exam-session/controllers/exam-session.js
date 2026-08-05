@@ -97,21 +97,32 @@ module.exports = {
         (q) => questionsMap[q.id] || q,
       );
 
-      const questionsForClient = orderedQuestions.map((q) => ({
-        id: q.id,
-        documentId: q.documentId,
-        text: q.text || q.textLv || q.textEn || q.textRu || "",
-        type: q.type,
-        options: q.options || ["true", "false"],
-        media: q.media,
-        correctAnswer: q.correctAnswer,
-      }));
+      const showResultsInResume = exam.showResults === true;
+      const questionsForClient = orderedQuestions.map((q) => {
+        const question = {
+          id: q.id,
+          documentId: q.documentId,
+          text: q.text || q.textLv || q.textEn || q.textRu || "",
+          type: q.type,
+          options: (q.options?.length > 0 ? q.options : null) ||
+                   (q.optionsLv?.length > 0 ? q.optionsLv : null) ||
+                   (q.optionsRu?.length > 0 ? q.optionsRu : null) ||
+                   (q.optionsEn?.length > 0 ? q.optionsEn : null) ||
+                   ["true", "false"],
+          media: q.media,
+        };
+        // Only send correct answers to client if results are released
+        if (showResultsInResume) {
+          question.correctAnswer = q.correctAnswer;
+        }
+        return question;
+      });
 
       return ctx.send({
         attemptId: existing.id,
         duration: exam.duration,
         remainingSeconds,
-        showResults: exam.showResults === true,
+        showResults: showResultsInResume,
         questions: questionsForClient,
         answers: existing.answers || {},
         examTitle: exam.title,
@@ -152,9 +163,13 @@ module.exports = {
     const questionsForClient = selected.map((q) => ({
       id: q.id,
       documentId: q.documentId,
-      text: q.text,
+      text: q.text || q.textLv || q.textEn || q.textRu || "",
       type: q.type,
-      options: q.options,
+      options: (q.options?.length > 0 ? q.options : null) ||
+               (q.optionsLv?.length > 0 ? q.optionsLv : null) ||
+               (q.optionsRu?.length > 0 ? q.optionsRu : null) ||
+               (q.optionsEn?.length > 0 ? q.optionsEn : null) ||
+               ["true", "false"],
       media: q.media,
     }));
 
@@ -220,11 +235,29 @@ module.exports = {
     const courseData = attempt.course;
     const isQuickQuiz = !examData && !!courseData;
 
+    const now = new Date();
+    const startedAt = attempt.startedAt ? new Date(attempt.startedAt) : null;
+
+    // Check if time has expired — soft warning, don't reject
+    let timedOut = false;
+    if (examData?.closeAt && new Date(examData.closeAt) < now) {
+      timedOut = true;
+    }
+    if (examData?.duration && startedAt) {
+      const elapsedSeconds = Math.floor((now - startedAt) / 1000);
+      const maxDurationSeconds = examData.duration * 60;
+      if (elapsedSeconds > maxDurationSeconds + 30) {
+        timedOut = true;
+      }
+    }
+
     const passingScore = examData?.passingScore || 70;
     const showResults = examData?.showResults === true;
 
     const questions = attempt.questions || [];
 
+    // If time has expired, accept whatever answers exist (don't reject)
+    // Unanswered questions count as wrong
     const unanswered = questions.filter((q) => {
       const userAnswer = answers[q.id];
       return (
@@ -234,7 +267,7 @@ module.exports = {
       );
     });
 
-    if (unanswered.length > 0) {
+    if (unanswered.length > 0 && !timedOut) {
       return ctx.badRequest(
         `Please answer all questions before submitting. ${unanswered.length} unanswered.`,
       );
@@ -257,7 +290,6 @@ module.exports = {
     const passed = isQuickQuiz ? null : score >= passingScore;
 
     const submittedAt = new Date();
-    const startedAt = attempt.startedAt ? new Date(attempt.startedAt) : null;
     const timeSpentSeconds =
       startedAt ? Math.max(0, Math.floor((submittedAt - startedAt) / 1000)) : null;
 
@@ -272,8 +304,15 @@ module.exports = {
       },
     });
 
-    console.log("EXAM DATA:", examData);
-    console.log("SHOW RESULTS:", showResults);
+    if (!showResults && !isQuickQuiz) {
+      // Hide score data until admin releases results
+      return ctx.send({
+        showResults: false,
+        submittedAt,
+        timeSpentSeconds,
+        startedAt,
+      });
+    }
 
     return ctx.send({
       score,
@@ -307,15 +346,6 @@ module.exports = {
         where: { course: course.id },
         populate: ["media"],
       });
-    console.log(
-      "Questions from DB:",
-      allQuestions.map((q) => ({
-        id: q.id,
-        text: q.text.slice(0, 20),
-        correctAnswer: q.correctAnswer,
-      })),
-    );
-    console.log("First question full object:", JSON.stringify(allQuestions[0]));
     if (allQuestions.length === 0) {
       return ctx.badRequest("No questions available for this course");
     }
@@ -333,7 +363,11 @@ module.exports = {
       documentId: q.documentId,
       text: q.text || q.textLv || q.textEn || q.textRu || "",
       type: q.type,
-      options: q.options || ["true", "false"],
+      options: (q.options?.length > 0 ? q.options : null) ||
+               (q.optionsLv?.length > 0 ? q.optionsLv : null) ||
+               (q.optionsRu?.length > 0 ? q.optionsRu : null) ||
+               (q.optionsEn?.length > 0 ? q.optionsEn : null) ||
+               ["true", "false"],
       media: q.media,
       correctAnswer: q.correctAnswer,
     }));
@@ -354,7 +388,7 @@ module.exports = {
     return ctx.send({
       attemptId: attempt.id,
       questions: questionsForClient,
-      courseTitle: course.title,
+      courseTitle: course.title || course.titleLv || course.titleEn || course.titleRu || '',
       total: questionsForClient.length,
       startedAt: attempt.startedAt,
     });
