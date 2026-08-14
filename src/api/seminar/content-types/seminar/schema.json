@@ -1,0 +1,68 @@
+{
+  "kind": "collectionType",
+  "collectionName": "seminars",
+  "info": {
+    "singularName": "seminar",
+    "pluralName": "seminars",
+    "displayName": "Seminar"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "string"
+    },
+    "place": {
+      "type": "json"
+    },
+    "date": {
+      "type": "date"
+    },
+    "time_from": {
+      "type": "time"
+    },
+    "time_to": {
+      "type": "time"
+    },
+    "type": {
+      "type": "enumeration",
+      "enum": [
+        "Practical Kata",
+        "Practical Kumite",
+        "Teoretical Kata",
+        "Teoretical Kumite",
+        "Secretary"
+      ]
+    },
+    "isOnline": {
+      "type": "boolean"
+    },
+    "meetingUrl": {
+      "type": "string",
+      "description": "Optional Zoom/meeting link — may be added later, never required"
+    },
+    "topics": {
+      "type": "json",
+      "description": "Stable topic keys (kata_theory, kumite_practice, ...) — labels come from frontend translation keys"
+    },
+    "certificateSignerName": {
+      "type": "string"
+    },
+    "certificateSignerTitle": {
+      "type": "string"
+    },
+    "presidentSignerName": {
+      "type": "string",
+      "default": "Santa Drozdova"
+    },
+    "presidentSignerTitle": {
+      "type": "string",
+      "default": "LKF President"
+    }
+  }
+}

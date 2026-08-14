@@ -50,7 +50,14 @@ module.exports = ({ env }) => ({
   'deep-populate': {
     enabled: true,
     config: {
-      useCache: true,
+      // WORKAROUND (BUG-001, see QA_AUDIT.md): with useCache: true the plugin's
+      // mutation-time deep-populate walk crashes on D&P content types when a
+      // `course` relation is passed as a documentId string (null key ->
+      // 'Cannot read properties of null (reading startsWith)'). Disabling the
+      // cache skips that broken path while replaceWildcard still deep-populates
+      // `populate=*` for the frontend. Revisit when @fourlights/
+      // strapi-plugin-deep-populate ships an upstream fix.
+      useCache: false,
       replaceWildcard: true,  // makes populate=* deep automatically
     }
   }

@@ -66,16 +66,18 @@ module.exports = {
     const studyHours = 0
 
     // 3) Upcoming exam (nearest openAt in future)
-    
+    // NB: strapi.documents() is the Strapi 5 API — it only understands
+    // `filters`, `sort`, `limit`/`pageSize`, `status` and `populate`. The
+    // v4-style `where`/`orderBy` keys are silently ignored, which used to
+    // return an arbitrary (often already completed) exam.
     const upcoming = await strapi
       .documents('api::exam.exam')
       .findMany({
-        where: {
-          openAt: { $gt: now },
-        },
-        orderBy: { openAt: 'asc' },
+        filters: { openAt: { $gt: now } },
+        sort: { openAt: 'asc' },
         limit: 1,
-        populate: ['course', 'questions'],   // add this
+        status: 'published',
+        populate: ['course', 'questions'],
       })
 
     let upcomingExam = null
@@ -88,10 +90,12 @@ module.exports = {
       const diffSec = Math.max(0, Math.floor(diffMs / 1000))
       const days = Math.floor(diffSec / 86400)
       const hours = Math.floor((diffSec % 86400) / 3600)
+      const minutes = Math.floor((diffSec % 3600) / 60)
 
       const parts = []
       if (days > 0) parts.push(`${days} days`)
-      if (hours > 0) parts.push(`${hours} hours`)
+      if (days > 0 || hours > 0) parts.push(`${hours} hours`)
+      if (days === 0 && minutes > 0) parts.push(`${minutes} minutes`)
 
       upcomingExam = {
         id: exam.id,

@@ -120,6 +120,12 @@
     "rank": {
       "type": "string"
     },
+    "rankKumite": {
+      "type": "string"
+    },
+    "rankKata": {
+      "type": "string"
+    },
     "language": {
       "type": "enumeration",
       "enum": [

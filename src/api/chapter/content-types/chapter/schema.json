@@ -75,6 +75,32 @@
         "manual",
         "pdf"
       ]
+    },
+    "chapterKey": {
+      "type": "string"
+    },
+    "sourceFile": {
+      "type": "string"
+    },
+    "sourceVersion": {
+      "type": "string"
+    },
+    "sourceLanguage": {
+      "type": "enumeration",
+      "enum": [
+        "En",
+        "Lv",
+        "Ru"
+      ]
+    },
+    "contentHash": {
+      "type": "text"
+    },
+    "sourcePageFrom": {
+      "type": "integer"
+    },
+    "sourcePageTo": {
+      "type": "integer"
     }
   }
 }

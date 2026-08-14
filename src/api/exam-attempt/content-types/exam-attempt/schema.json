@@ -29,6 +29,14 @@
     "questions": {
       "type": "json"
     },
+    "manualGrades": {
+      "type": "json",
+      "description": "Per-question manual grades for open-text answers, keyed by question id: 1 = correct, 0 = incorrect"
+    },
+    "kind": {
+      "type": "string",
+      "description": "Snapshot of what this attempt is: 'exam' or 'quick_quiz'. Stored at creation so results survive course/exam deletion."
+    },
     "exam": {
       "type": "relation",
       "relation": "manyToOne",
@@ -49,6 +57,23 @@
       "relation": "manyToOne",
       "target": "api::course.course",
       "inversedBy": "exam_attempts"
+    },
+    "blurEventCount": {
+      "type": "integer",
+      "default": 0
+    },
+    "totalTimeOutsideSeconds": {
+      "type": "integer",
+      "default": 0
+    },
+    "lastVisibilityState": {
+      "type": "string"
+    },
+    "lastKnownPage": {
+      "type": "string"
+    },
+    "lastActivityAt": {
+      "type": "datetime"
     }
   }
 }

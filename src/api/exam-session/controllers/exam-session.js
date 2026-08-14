@@ -1,5 +1,20 @@
 "use strict";
 
+// This Strapi setup stores a draft + a published row per document, so raw
+// db queries return every document twice. Collapse to one row per documentId,
+// preferring the published row (publishedAt set) when both exist.
+function dedupeByDocumentId(rows) {
+  const byDoc = new Map();
+  for (const row of rows || []) {
+    const key = row.documentId;
+    const existing = byDoc.get(key);
+    if (!existing || (row.publishedAt && !existing.publishedAt)) {
+      byDoc.set(key, row);
+    }
+  }
+  return Array.from(byDoc.values());
+}
+
 module.exports = {
   async start(ctx) {
     const user = ctx.state.user;
@@ -65,6 +80,12 @@ module.exports = {
       const now = new Date();
       let remainingSeconds = exam.duration * 60;
 
+      // Touch lastActivityAt so the monitoring view shows the student is back
+      await strapi.db.query("api::exam-attempt.exam-attempt").update({
+        where: { id: existing.id },
+        data: { lastActivityAt: now },
+      });
+
       const startedAt = new Date(existing.startedAt);
       const secondsSinceStart = Math.floor(
         (Number(now) - Number(startedAt)) / 1000,
@@ -110,6 +131,8 @@ module.exports = {
                    (q.optionsEn?.length > 0 ? q.optionsEn : null) ||
                    ["true", "false"],
           media: q.media,
+          videoAkaUrl: q.videoAkaUrl || null,
+          videoAoUrl: q.videoAoUrl || null,
         };
         // Only send correct answers to client if results are released
         if (showResultsInResume) {
@@ -138,25 +161,17 @@ module.exports = {
     let selected = [];
 
     if (examWithQuestions.questions && examWithQuestions.questions.length > 0) {
-      // Use admin-selected questions, shuffle them
+      // Use the admin-selected questions, shuffle their order per attempt
       selected = examWithQuestions.questions.sort(() => Math.random() - 0.5);
     } else {
-      // Fallback to random from course pool
-      const allQuestions = await strapi.db
-        .query("api::question.question")
-        .findMany({
-          where: { course: exam.course.id },
-          populate: ["media"],
-        });
-      if (allQuestions.length === 0) {
-        return ctx.badRequest("No questions available for this exam");
-      }
-      const count = Math.min(exam.questionCount || 10, allQuestions.length);
-      selected = allQuestions.sort(() => Math.random() - 0.5).slice(0, count);
-    }
-
-    if (selected.length === 0) {
-      return ctx.badRequest("No questions available for this exam");
+      // Exams require an explicit question set — the admin must pick the
+      // questions in the admin panel. There is intentionally no fallback to
+      // a random course pool anymore: a stored questionCount with no actual
+      // selection made the student card claim "N questions" while the admin
+      // editor showed none chosen.
+      return ctx.badRequest(
+        "This exam has no questions selected. An administrator must choose the questions first.",
+      );
     }
 
     // Strip correct answers before sending to client
@@ -171,6 +186,8 @@ module.exports = {
                (q.optionsEn?.length > 0 ? q.optionsEn : null) ||
                ["true", "false"],
       media: q.media,
+      videoAkaUrl: q.videoAkaUrl || null,
+      videoAoUrl: q.videoAoUrl || null,
     }));
 
     // Store full questions (with answers) in the attempt
@@ -178,11 +195,17 @@ module.exports = {
       .query("api::exam-attempt.exam-attempt")
       .create({
         data: {
+          kind: "exam",
           exam: exam.id,
           user: user.id,
           startedAt: new Date(),
           questions: selected,
           answers: {},
+          lastActivityAt: new Date(),
+          blurEventCount: 0,
+          totalTimeOutsideSeconds: 0,
+          lastVisibilityState: "visible",
+          lastKnownPage: "exam",
           publishedAt: new Date(),
         },
       });
@@ -276,7 +299,22 @@ module.exports = {
     let correct = 0;
     questions.forEach((q) => {
       const userAnswer = answers[q.id];
-      if (q.correctAnswer !== undefined && q.correctAnswer !== null) {
+      // Multiple-select (multiple_choice): grade by set equality on the arrays.
+      // Only treat correctAnswers as the expected list when it actually holds
+      // values — an empty array must fall through to the single-answer check.
+      const expectedList =
+        Array.isArray(q.correctAnswers) && q.correctAnswers.length > 0
+          ? q.correctAnswers
+          : null;
+      if (expectedList) {
+        const ua = (Array.isArray(userAnswer) ? userAnswer : [])
+          .map((v) => String(v))
+          .sort();
+        const ex = expectedList.map((v) => String(v)).sort();
+        if (ua.length === ex.length && ua.every((v, i) => v === ex[i])) {
+          correct++;
+        }
+      } else if (q.correctAnswer !== undefined && q.correctAnswer !== null) {
         if (
           String(userAnswer).toLowerCase() ===
           String(q.correctAnswer).toLowerCase()
@@ -293,15 +331,29 @@ module.exports = {
     const timeSpentSeconds =
       startedAt ? Math.max(0, Math.floor((submittedAt - startedAt) / 1000)) : null;
 
+    // Persist any monitoring counters the client reported on submit too
+    // (the student page sends them with the final answers).
+    const submitTracking = {
+      blurEventCount: ctx.request.body.blurCount,
+      totalTimeOutsideSeconds: ctx.request.body.totalTimeOutsideSeconds,
+      lastVisibilityState: ctx.request.body.lastVisibilityState,
+      lastKnownPage: ctx.request.body.lastKnownPage,
+    };
+    const submitData = {
+      answers,
+      score,
+      passed,
+      submittedAt,
+      timeSpentSeconds,
+      lastActivityAt: submittedAt,
+    };
+    for (const [key, value] of Object.entries(submitTracking)) {
+      if (value !== undefined && value !== null) submitData[key] = value;
+    }
+
     await strapi.db.query("api::exam-attempt.exam-attempt").update({
       where: { id: attemptId },
-      data: {
-        answers,
-        score,
-        passed,
-        submittedAt,
-        timeSpentSeconds,
-      },
+      data: submitData,
     });
 
     if (!showResults && !isQuickQuiz) {
@@ -340,12 +392,20 @@ module.exports = {
 
     if (!course) return ctx.notFound("Course not found");
 
-    const allQuestions = await strapi.db
-      .query("api::question.question")
-      .findMany({
-        where: { course: course.id },
-        populate: ["media"],
-      });
+    // Match questions by the course DOCUMENT id, not the numeric row id.
+    // Draft-and-publish courses exist as two rows (draft + published), and
+    // questions link to whichever row was live at creation time — querying
+    // `course: course.id` (documents.findOne returns the draft row) finds
+    // nothing when the questions point at the published row (BUG: quick quiz
+    // reported "No questions available" despite 120 questions existing).
+    const allQuestions = dedupeByDocumentId(
+      await strapi.db
+        .query("api::question.question")
+        .findMany({
+          where: { course: { documentId: { $eq: courseDocumentId } } },
+          populate: ["media"],
+        }),
+    );
     if (allQuestions.length === 0) {
       return ctx.badRequest("No questions available for this course");
     }
@@ -369,6 +429,8 @@ module.exports = {
                (q.optionsEn?.length > 0 ? q.optionsEn : null) ||
                ["true", "false"],
       media: q.media,
+      videoAkaUrl: q.videoAkaUrl || null,
+      videoAoUrl: q.videoAoUrl || null,
       correctAnswer: q.correctAnswer,
     }));
 
@@ -376,6 +438,7 @@ module.exports = {
       .query("api::exam-attempt.exam-attempt")
       .create({
         data: {
+          kind: "quick_quiz",
           user: user.id,
           course: course.id,
           questions: selected,
@@ -415,9 +478,26 @@ module.exports = {
     const currentAnswers = attempt.answers || {};
     const mergedAnswers = { ...currentAnswers, ...answers };
 
+    const data = { answers: mergedAnswers, lastActivityAt: new Date() };
+
+    // Silent monitoring counters — sent by the student exam page along with
+    // every save. Only overwrite when the client actually reports a value.
+    const tracking = {
+      blurCount: "blurEventCount",
+      totalTimeOutsideSeconds: "totalTimeOutsideSeconds",
+      lastVisibilityState: "lastVisibilityState",
+      lastKnownPage: "lastKnownPage",
+    };
+    for (const [bodyKey, fieldKey] of Object.entries(tracking)) {
+      const value = ctx.request.body[bodyKey];
+      if (value !== undefined && value !== null) {
+        data[fieldKey] = value;
+      }
+    }
+
     await strapi.db.query("api::exam-attempt.exam-attempt").update({
       where: { id: attemptId },
-      data: { answers: mergedAnswers },
+      data,
     });
 
     return ctx.send({ ok: true, answers: mergedAnswers });

@@ -7,7 +7,7 @@
     "displayName": "Question"
   },
   "options": {
-    "draftAndPublish": true
+    "draftAndPublish": false
   },
   "pluginOptions": {},
   "attributes": {
@@ -19,13 +19,24 @@
       "enum": [
         "multiple_choice",
         "yes_no",
-        "open_text"
+        "open_text",
+        "single_choice",
+        "aka_ao"
       ]
     },
     "optionsLv": {
       "type": "json"
     },
     "correctAnswer": {
+      "type": "string"
+    },
+    "correctAnswers": {
+      "type": "json"
+    },
+    "videoAkaUrl": {
+      "type": "string"
+    },
+    "videoAoUrl": {
       "type": "string"
     },
     "course": {
@@ -83,6 +94,16 @@
       "enum": [
         "manual",
         "pdf"
+      ]
+    },
+    "sourceDocumentKey": {
+      "type": "string"
+    },
+    "answerStatus": {
+      "type": "enumeration",
+      "enum": [
+        "answered",
+        "missing"
       ]
     }
   }

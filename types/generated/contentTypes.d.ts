@@ -494,6 +494,8 @@ export interface ApiChapterChapter extends Struct.CollectionTypeSchema {
       'oneToMany',
       'api::chapter-progress.chapter-progress'
     >;
+    chapterKey: Schema.Attribute.String;
+    contentHash: Schema.Attribute.Text;
     course: Schema.Attribute.Relation<'manyToOne', 'api::course.course'>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -508,7 +510,12 @@ export interface ApiChapterChapter extends Struct.CollectionTypeSchema {
     order: Schema.Attribute.Integer;
     publishedAt: Schema.Attribute.DateTime;
     questions: Schema.Attribute.Relation<'oneToMany', 'api::question.question'>;
+    sourceFile: Schema.Attribute.String;
+    sourceLanguage: Schema.Attribute.Enumeration<['En', 'Lv', 'Ru']>;
     sourceMode: Schema.Attribute.Enumeration<['manual', 'pdf']>;
+    sourcePageFrom: Schema.Attribute.Integer;
+    sourcePageTo: Schema.Attribute.Integer;
+    sourceVersion: Schema.Attribute.String;
     titleEn: Schema.Attribute.String;
     titleLv: Schema.Attribute.String;
     titleRu: Schema.Attribute.String;
@@ -516,6 +523,39 @@ export interface ApiChapterChapter extends Struct.CollectionTypeSchema {
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     videoUrl: Schema.Attribute.String;
+  };
+}
+
+export interface ApiCompetitionCompetition extends Struct.CollectionTypeSchema {
+  collectionName: 'competitions';
+  info: {
+    displayName: 'Competition';
+    pluralName: 'competitions';
+    singularName: 'competition';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    date_from: Schema.Attribute.Date;
+    date_to: Schema.Attribute.Date;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::competition.competition'
+    > &
+      Schema.Attribute.Private;
+    place: Schema.Attribute.JSON;
+    publishedAt: Schema.Attribute.DateTime;
+    rating: Schema.Attribute.Enumeration<['International', 'EKF', 'LV']>;
+    slug: Schema.Attribute.String;
+    title: Schema.Attribute.String;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
   };
 }
 
@@ -575,17 +615,23 @@ export interface ApiExamAttemptExamAttempt extends Struct.CollectionTypeSchema {
   };
   attributes: {
     answers: Schema.Attribute.JSON;
+    blurEventCount: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
     course: Schema.Attribute.Relation<'manyToOne', 'api::course.course'>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     exam: Schema.Attribute.Relation<'manyToOne', 'api::exam.exam'>;
+    kind: Schema.Attribute.String;
+    lastActivityAt: Schema.Attribute.DateTime;
+    lastKnownPage: Schema.Attribute.String;
+    lastVisibilityState: Schema.Attribute.String;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
       'api::exam-attempt.exam-attempt'
     > &
       Schema.Attribute.Private;
+    manualGrades: Schema.Attribute.JSON;
     passed: Schema.Attribute.Boolean;
     publishedAt: Schema.Attribute.DateTime;
     questions: Schema.Attribute.JSON;
@@ -593,6 +639,8 @@ export interface ApiExamAttemptExamAttempt extends Struct.CollectionTypeSchema {
     startedAt: Schema.Attribute.DateTime;
     submittedAt: Schema.Attribute.DateTime;
     timeSpentSeconds: Schema.Attribute.Integer;
+    totalTimeOutsideSeconds: Schema.Attribute.Integer &
+      Schema.Attribute.DefaultTo<0>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -651,11 +699,13 @@ export interface ApiQuestionQuestion extends Struct.CollectionTypeSchema {
     singularName: 'question';
   };
   options: {
-    draftAndPublish: true;
+    draftAndPublish: false;
   };
   attributes: {
+    answerStatus: Schema.Attribute.Enumeration<['answered', 'missing']>;
     chapter: Schema.Attribute.Relation<'manyToOne', 'api::chapter.chapter'>;
     correctAnswer: Schema.Attribute.String;
+    correctAnswers: Schema.Attribute.JSON;
     course: Schema.Attribute.Relation<'manyToOne', 'api::course.course'>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -674,6 +724,7 @@ export interface ApiQuestionQuestion extends Struct.CollectionTypeSchema {
     order: Schema.Attribute.Integer;
     publishedAt: Schema.Attribute.DateTime;
     showInChapter: Schema.Attribute.Boolean;
+    sourceDocumentKey: Schema.Attribute.String;
     sourceFile: Schema.Attribute.String;
     sourceLang: Schema.Attribute.String;
     sourceMode: Schema.Attribute.Enumeration<['manual', 'pdf']>;
@@ -681,7 +732,60 @@ export interface ApiQuestionQuestion extends Struct.CollectionTypeSchema {
     textLv: Schema.Attribute.Text;
     textRu: Schema.Attribute.Text;
     type: Schema.Attribute.Enumeration<
-      ['multiple_choice', 'yes_no', 'open_text']
+      ['multiple_choice', 'yes_no', 'open_text', 'single_choice', 'aka_ao']
+    >;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    videoAkaUrl: Schema.Attribute.String;
+    videoAoUrl: Schema.Attribute.String;
+  };
+}
+
+export interface ApiSeminarSeminar extends Struct.CollectionTypeSchema {
+  collectionName: 'seminars';
+  info: {
+    displayName: 'Seminar';
+    pluralName: 'seminars';
+    singularName: 'seminar';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    certificateSignerName: Schema.Attribute.String;
+    certificateSignerTitle: Schema.Attribute.String;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    date: Schema.Attribute.Date;
+    isOnline: Schema.Attribute.Boolean;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::seminar.seminar'
+    > &
+      Schema.Attribute.Private;
+    meetingUrl: Schema.Attribute.String;
+    place: Schema.Attribute.JSON;
+    presidentSignerName: Schema.Attribute.String &
+      Schema.Attribute.DefaultTo<'Santa Drozdova'>;
+    presidentSignerTitle: Schema.Attribute.String &
+      Schema.Attribute.DefaultTo<'LKF President'>;
+    publishedAt: Schema.Attribute.DateTime;
+    slug: Schema.Attribute.String;
+    time_from: Schema.Attribute.Time;
+    time_to: Schema.Attribute.Time;
+    title: Schema.Attribute.String;
+    topics: Schema.Attribute.JSON;
+    type: Schema.Attribute.Enumeration<
+      [
+        'Practical Kata',
+        'Practical Kumite',
+        'Teoretical Kata',
+        'Teoretical Kumite',
+        'Secretary',
+      ]
     >;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -1243,6 +1347,8 @@ export interface PluginUsersPermissionsUser
     provider: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
     rank: Schema.Attribute.String;
+    rankKata: Schema.Attribute.String;
+    rankKumite: Schema.Attribute.String;
     rejectionReason: Schema.Attribute.Text;
     resetPasswordToken: Schema.Attribute.String & Schema.Attribute.Private;
     role: Schema.Attribute.Relation<
@@ -1278,10 +1384,12 @@ declare module '@strapi/strapi' {
       'admin::user': AdminUser;
       'api::chapter-progress.chapter-progress': ApiChapterProgressChapterProgress;
       'api::chapter.chapter': ApiChapterChapter;
+      'api::competition.competition': ApiCompetitionCompetition;
       'api::course.course': ApiCourseCourse;
       'api::exam-attempt.exam-attempt': ApiExamAttemptExamAttempt;
       'api::exam.exam': ApiExamExam;
       'api::question.question': ApiQuestionQuestion;
+      'api::seminar.seminar': ApiSeminarSeminar;
       'plugin::content-releases.release': PluginContentReleasesRelease;
       'plugin::content-releases.release-action': PluginContentReleasesReleaseAction;
       'plugin::deep-populate.cache': PluginDeepPopulateCache;
