@@ -49,6 +49,12 @@
       "relation": "manyToMany",
       "target": "api::question.question",
       "inversedBy": "exams"
+    },
+    "questionDecisions": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::exam-question-decision.exam-question-decision",
+      "mappedBy": "exam"
     }
   }
 }

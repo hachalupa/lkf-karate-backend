@@ -89,6 +89,46 @@ module.exports = {
       strapi.log.warn('[bootstrap] Could not ensure exam-attempt.monitoring permission:', err.message)
     }
 
+    // ── Allow admin grading actions through the permission layer ──
+    // PUT /exam-attempts/grade/:id, GET /exam-attempts/all and
+    // PUT /exam-attempts/change-answer-decision are admin-only; the
+    // controllers re-check isAdmin. Grant idempotently so fresh DBs / resets
+    // work too (same pattern as findOne / monitoring / bulkUpdateAnswers).
+    try {
+      const actions = [
+        "api::exam-attempt.exam-attempt.findAll",
+        "api::exam-attempt.exam-attempt.grade",
+        "api::exam-attempt.exam-attempt.changeAnswerDecision",
+        "api::exam-attempt.exam-attempt.getExamDecisions",
+      ];
+      const authRoleForGrading = await strapi
+        .query("plugin::users-permissions.role")
+        .findOne({ where: { type: "authenticated" } });
+
+      if (!authRoleForGrading) {
+        strapi.log.warn(
+          "[bootstrap] Authenticated role not found — cannot grant grading permissions"
+        );
+      } else {
+        for (const action of actions) {
+          const granted = await strapi
+            .query("plugin::users-permissions.permission")
+            .findMany({ where: { action, role: authRoleForGrading.id } });
+          if (granted.length === 0) {
+            await strapi
+              .query("plugin::users-permissions.permission")
+              .create({ data: { action, role: authRoleForGrading.id } });
+            strapi.log.info(`[bootstrap] Granted ${action} to Authenticated role`);
+          }
+        }
+      }
+    } catch (err) {
+      strapi.log.warn(
+        "[bootstrap] Could not ensure exam-attempt grading permissions:",
+        err.message
+      );
+    }
+
     // ── Allow the bulk-update-answers action through the permission layer ──
     // PUT /questions/bulk-update-answers uses a custom controller action; the
     // users-permissions layer derives the scope from the action name and
@@ -120,12 +160,17 @@ module.exports = {
       strapi.log.warn('[bootstrap] Could not ensure question.bulkUpdateAnswers permission:', err.message)
     }
 
-    // ── Public read access to competitions for the landing-page calendar ──
-    // Competitions are for everyone (seminars are judges-only), so guests must
-    // be able to list them without an account. Grant the Public role the
-    // find + findOne actions idempotently so fresh DBs / resets work too.
+    // ── Public read access to seminars + competitions (calendar events) ──
+    // The landing page shows competitions to everyone, and seminars are the
+    // same kind of public calendar information. Guests must be able to list
+    // them without an account — otherwise the calendar 403s the moment one of
+    // the collections is empty (Strapi checks the permission before the data).
+    // Grant the Public role the find + findOne actions idempotently so fresh
+    // DBs / resets work too.
     try {
       const actions = [
+        'api::seminar.seminar.find',
+        'api::seminar.seminar.findOne',
         'api::competition.competition.find',
         'api::competition.competition.findOne',
       ]
@@ -134,7 +179,7 @@ module.exports = {
         .findOne({ where: { type: 'public' } })
 
       if (!publicRole) {
-        strapi.log.warn('[bootstrap] Public role not found — cannot grant competition read permissions')
+        strapi.log.warn('[bootstrap] Public role not found — cannot grant seminar/competition read permissions')
       } else {
         for (const action of actions) {
           const granted = await strapi
@@ -149,7 +194,7 @@ module.exports = {
         }
       }
     } catch (err) {
-      strapi.log.warn('[bootstrap] Could not ensure competition read permissions:', err.message)
+      strapi.log.warn('[bootstrap] Could not ensure seminar/competition read permissions:', err.message)
     }
   },
 }
