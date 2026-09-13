@@ -12,32 +12,22 @@ const {
   getQuestionMaxPoints,
   getQuestionPoints,
   computeScore,
-  getBankDecision,
   getExpectedAnswer,
 } = require('../src/utils/grading');
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+// Open-text fields hold judge-facing EXAMPLE text only — no decisions.
 const openText6 = {
   id: 1,
   type: 'open_text',
-  answerFieldsLv: [
-    { expected: 'A', correct: true },
-    { expected: 'B', correct: true },
-    { expected: 'C', correct: true },
-    { expected: 'D', correct: true },
-    { expected: 'E', correct: true },
-    { expected: 'F', correct: true },
-  ],
+  answerFieldsLv: Array.from({ length: 6 }, (_, i) => ({ expected: `A${i}` })),
 };
 
 const openText11 = {
   id: 2,
   type: 'open_text',
-  answerFieldsLv: Array.from({ length: 11 }, (_, i) => ({
-    expected: `A${i + 1}`,
-    correct: true,
-  })),
+  answerFieldsLv: Array.from({ length: 11 }, (_, i) => ({ expected: `A${i + 1}` })),
 };
 
 const yesNo = { id: 3, type: 'yes_no', correctAnswer: 'true' };
@@ -69,11 +59,8 @@ test('getAnswerFieldCount: counts the largest language array (arrays kept in syn
   assert.equal(
     getAnswerFieldCount({
       type: 'open_text',
-      answerFieldsLv: [{ expected: 'a', correct: true }],
-      answerFieldsEn: [
-        { expected: 'a', correct: true },
-        { expected: 'b', correct: true },
-      ],
+      answerFieldsLv: [{ expected: 'a' }],
+      answerFieldsEn: [{ expected: 'a' }, { expected: 'b' }],
     }),
     2,
   );
@@ -149,6 +136,18 @@ test('points: empty student answer + no grades → 0', () => {
   assert.equal(getQuestionPoints(openText6, ['', '', '', '', '', ''], {}), 0);
 });
 
+test('points: question-bank example text never affects the score', () => {
+  // Only the saved per-field decisions count. Rewriting the examples must not
+  // change an already-graded result.
+  const manualGrades = { 1: { 0: 1, 1: 0 } };
+  assert.equal(getQuestionPoints(openText6, ['a', 'b'], manualGrades), 1);
+  const reworded = {
+    ...openText6,
+    answerFieldsLv: Array.from({ length: 6 }, (_, i) => ({ expected: `NEW ${i}` })),
+  };
+  assert.equal(getQuestionPoints(reworded, ['a', 'b'], manualGrades), 1);
+});
+
 test('auto-grade: yes/no works as before', () => {
   assert.equal(autoGradeQuestion(yesNo, 'true'), true);
   assert.equal(autoGradeQuestion(yesNo, 'false'), false);
@@ -194,6 +193,34 @@ test('computeScore: legacy manualGrades number format still counts', () => {
   assert.equal(result.maxPoints, 6);
 });
 
+test('quick-quiz rationale: ungraded open-text always scores 0 even with a full answer', () => {
+  // Quick quizzes have no judge, so manualGrades is always empty — this is
+  // why quickQuiz() excludes open-text questions from the pool.
+  const questions = [openText6];
+  const result = computeScore({
+    questions,
+    answers: { 1: ['A', 'B', 'C', 'D', 'E', 'F'] },
+    manualGrades: {},
+    passingScore: 50,
+  });
+  assert.equal(result.totalPoints, 0);
+  assert.equal(result.maxPoints, 6);
+  assert.equal(result.score, 0);
+  assert.equal(result.passed, false);
+});
+
+test('quick-quiz rationale: an all-open-text quiz pool would be entirely unscored', () => {
+  const questions = [openText6, openText11];
+  const result = computeScore({
+    questions,
+    answers: {},
+    manualGrades: {},
+    passingScore: 50,
+  });
+  assert.equal(result.totalPoints, 0);
+  assert.equal(result.maxPoints, 17);
+});
+
 test('computeScore: recalculation is idempotent — same grades, same score', () => {
   const base = {
     questions: [yesNo, openText6],
@@ -206,43 +233,26 @@ test('computeScore: recalculation is idempotent — same grades, same score', ()
   assert.deepEqual(first, second);
 });
 
-// ── Bank decisions ──────────────────────────────────────────────────────────
-
-test('getBankDecision: reads the correct flag (Lv first)', () => {
-  assert.equal(getBankDecision(openText6, 0), true);
-  const q = {
-    type: 'open_text',
-    answerFieldsLv: [
-      { expected: 'x', correct: false },
-      { expected: 'y', correct: true },
-    ],
-  };
-  assert.equal(getBankDecision(q, 0), false);
-  assert.equal(getBankDecision(q, 1), true);
-});
-
-test('getBankDecision: falls back to Ru/En when Lv missing', () => {
-  const q = {
-    type: 'open_text',
-    answerFieldsEn: [{ expected: 'x', correct: false }],
-  };
-  assert.equal(getBankDecision(q, 0), false);
-});
-
-test('getBankDecision: legacy question without config → correct', () => {
-  assert.equal(getBankDecision({ id: 9, type: 'open_text' }, 0), true);
-});
+// ── Expected (example) answers ──────────────────────────────────────────────
 
 test('getExpectedAnswer: language-aware with Lv → En fallback', () => {
   const q = {
     type: 'open_text',
-    answerFieldsLv: [{ expected: 'Latviski', correct: true }],
-    answerFieldsEn: [{ expected: 'English', correct: true }],
+    answerFieldsLv: [{ expected: 'Latviski' }],
+    answerFieldsEn: [{ expected: 'English' }],
   };
   assert.equal(getExpectedAnswer(q, 0, 'lv'), 'Latviski');
   assert.equal(getExpectedAnswer(q, 0, 'en'), 'English');
   assert.equal(getExpectedAnswer(q, 0, 'ru'), 'Latviski'); // falls back to Lv
   assert.equal(getExpectedAnswer(q, 1, 'lv'), '');
+});
+
+test('getExpectedAnswer: tolerates legacy entries that still carry a correct flag', () => {
+  const q = {
+    type: 'open_text',
+    answerFieldsLv: [{ expected: 'Legacy', correct: true }],
+  };
+  assert.equal(getExpectedAnswer(q, 0, 'lv'), 'Legacy');
 });
 
 test('buildFieldGrades: only accepts 0/1 per field', () => {

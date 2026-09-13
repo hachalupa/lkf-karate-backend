@@ -723,6 +723,7 @@ export interface ApiExamExam extends Struct.CollectionTypeSchema {
       'manyToMany',
       'api::question.question'
     >;
+    reviewType: Schema.Attribute.String;
     showResults: Schema.Attribute.Boolean;
     title: Schema.Attribute.String;
     updatedAt: Schema.Attribute.DateTime;

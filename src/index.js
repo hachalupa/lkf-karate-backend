@@ -1,9 +1,24 @@
 'use strict'
 
+const { createId } = require('@paralleldrive/cuid2')
+const { repairPermissionDocumentIds } = require('./utils/permission-document-ids')
+
 module.exports = {
   register(/*{ strapi }*/) {},
 
   bootstrap: async ({ strapi }) => {
+    // ── Backfill documentIds on permissions created by the query layer ──
+    // Without a documentId these rows make deep-populate crash (see
+    // src/utils/permission-document-ids.js).
+    try {
+      const repaired = await repairPermissionDocumentIds(strapi)
+      if (repaired > 0) {
+        strapi.log.info(`[bootstrap] Backfilled documentId for ${repaired} permission(s)`)
+      }
+    } catch (err) {
+      strapi.log.warn('[bootstrap] Could not repair permission documentIds:', err.message)
+    }
+
     // ── Set the frontend reset password URL in the plugin store ──
     // This ensures forgot-password emails link to the React frontend
     // instead of the Strapi admin panel.
@@ -53,7 +68,7 @@ module.exports = {
         if (granted.length === 0) {
           await strapi
             .query('plugin::users-permissions.permission')
-            .create({ data: { action, role: authRole.id } })
+            .create({ data: { documentId: createId(), action, role: authRole.id } })
           strapi.log.info('[bootstrap] Granted exam-attempt.findOne to Authenticated role')
         }
       }
@@ -81,7 +96,7 @@ module.exports = {
         if (granted.length === 0) {
           await strapi
             .query('plugin::users-permissions.permission')
-            .create({ data: { action, role: authRoleForMonitoring.id } })
+            .create({ data: { documentId: createId(), action, role: authRoleForMonitoring.id } })
           strapi.log.info('[bootstrap] Granted exam-attempt.monitoring to Authenticated role')
         }
       }
@@ -90,16 +105,13 @@ module.exports = {
     }
 
     // ── Allow admin grading actions through the permission layer ──
-    // PUT /exam-attempts/grade/:id, GET /exam-attempts/all and
-    // PUT /exam-attempts/change-answer-decision are admin-only; the
-    // controllers re-check isAdmin. Grant idempotently so fresh DBs / resets
+    // PUT /exam-attempts/grade/:id and GET /exam-attempts/all are admin-only;
+    // the controllers re-check isAdmin. Grant idempotently so fresh DBs / resets
     // work too (same pattern as findOne / monitoring / bulkUpdateAnswers).
     try {
       const actions = [
         "api::exam-attempt.exam-attempt.findAll",
         "api::exam-attempt.exam-attempt.grade",
-        "api::exam-attempt.exam-attempt.changeAnswerDecision",
-        "api::exam-attempt.exam-attempt.getExamDecisions",
       ];
       const authRoleForGrading = await strapi
         .query("plugin::users-permissions.role")
@@ -117,7 +129,7 @@ module.exports = {
           if (granted.length === 0) {
             await strapi
               .query("plugin::users-permissions.permission")
-              .create({ data: { action, role: authRoleForGrading.id } });
+              .create({ data: { documentId: createId(), action, role: authRoleForGrading.id } });
             strapi.log.info(`[bootstrap] Granted ${action} to Authenticated role`);
           }
         }
@@ -152,7 +164,7 @@ module.exports = {
         if (granted.length === 0) {
           await strapi
             .query('plugin::users-permissions.permission')
-            .create({ data: { action, role: authRoleForBulk.id } })
+            .create({ data: { documentId: createId(), action, role: authRoleForBulk.id } })
           strapi.log.info('[bootstrap] Granted question.bulkUpdateAnswers to Authenticated role')
         }
       }
@@ -188,7 +200,7 @@ module.exports = {
           if (granted.length === 0) {
             await strapi
               .query('plugin::users-permissions.permission')
-              .create({ data: { action, role: publicRole.id } })
+              .create({ data: { documentId: createId(), action, role: publicRole.id } })
             strapi.log.info(`[bootstrap] Granted ${action} to Public role`)
           }
         }

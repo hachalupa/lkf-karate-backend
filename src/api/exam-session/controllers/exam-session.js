@@ -2,6 +2,7 @@
 
 const {
   getAnswerFieldCount,
+  isOpenTextQuestion,
   computeScore,
 } = require("../../../utils/grading");
 
@@ -69,6 +70,14 @@ module.exports = {
     
     if (!exam) {
       return ctx.notFound("Exam not found");
+    }
+
+    // Review exams (created after a question import) are admin-only workspace
+    // containers — students must never start or see them.
+    if (exam.reviewType) {
+      return ctx.badRequest(
+        "This exam is a review exam and is not available to students"
+      );
     }
 
     // Check if exam is open
@@ -397,12 +406,25 @@ module.exports = {
       return ctx.badRequest("No questions available for this course");
     }
 
+    // Quick quizzes auto-score on submit (no judge), but open-text questions
+    // cannot be auto-graded — they would silently contribute 0 points and
+    // mislead the student. Exclude them from the quiz pool so every question
+    // shown is actually scored. (Open-text practice happens in real exams.)
+    const quizQuestions = allQuestions.filter(
+      (q) => !isOpenTextQuestion(q)
+    );
+    if (quizQuestions.length === 0) {
+      return ctx.badRequest(
+        "No auto-scored questions available for this course (open-text questions are excluded from quick quizzes)"
+      );
+    }
+
     const questionCount =
       count === "all"
-        ? allQuestions.length
-        : Math.min(Number(count) || 10, allQuestions.length);
+        ? quizQuestions.length
+        : Math.min(Number(count) || 10, quizQuestions.length);
 
-    const shuffled = allQuestions.sort(() => Math.random() - 0.5);
+    const shuffled = quizQuestions.sort(() => Math.random() - 0.5);
     const selected = shuffled.slice(0, questionCount);
 
     const questionsForClient = selected.map((q) =>

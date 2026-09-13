@@ -4,10 +4,9 @@
  *
  * Requires the Strapi backend running locally (npm run develop) with the
  * default SQLite database. Creates throwaway users (one admin, two students),
- * an open-text question with 6 answer fields, a yes/no question, two exams
- * sharing the same questions, submits attempts, grades them, changes an
- * answer-bank decision and asserts that only the selected exam is
- * recalculated.
+ * an open-text question with 6 example answer fields, a yes/no question, two
+ * exams sharing the same questions, submits attempts, grades them per field,
+ * and verifies that editing the examples later never changes saved results.
  *
  * Run: npm run test:e2e
  */
@@ -130,7 +129,6 @@ async function main() {
   const expected = (i) => `Expected answer ${i + 1}`;
   const fields6 = Array.from({ length: 6 }, (_, i) => ({
     expected: expected(i),
-    correct: true,
   }));
 
   const qOpenRes = await api('POST', '/questions', {
@@ -293,102 +291,47 @@ async function main() {
   check('exam B attempt graded', s2Grade.status === 200, `${s2Grade.status}`);
   const s2ScoreBefore = s2Grade.json?.data?.score; // 1 + 6 = 7/7 = 100%
 
-  // ── Change answer-bank decision for exam A only ───────────────────────────
-  // Field 0 is correct in the bank; flip it to incorrect for exam A.
-  const changeRes = await api('PUT', '/exam-attempts/change-answer-decision', {
+  // ── Examples are static: editing them never changes saved results ─────────
+  // Scores come from the per-field manual grades saved on the attempt, never
+  // from the question-bank example text.
+  const reworded = fields6.map((f) => ({ expected: `${f.expected} (reworded)` }));
+  const updateQ = await api('PUT', `/questions/${qOpen.documentId}`, {
     token: adminToken,
     body: {
-      examDocumentId: examA.documentId,
-      questionDocumentId: qOpen.documentId,
-      fieldIndex: 0,
-      decision: 'incorrect',
+      data: {
+        answerFieldsLv: reworded,
+        answerFieldsRu: reworded,
+        answerFieldsEn: reworded,
+      },
     },
   });
-  check('change answer decision accepted', changeRes.status === 200, `${changeRes.status}`);
-  check('change reports recalculation', changeRes.json?.changed === true, JSON.stringify(changeRes.json));
-  check('change reports 1 recalculated attempt', changeRes.json?.recalculatedAttempts === 1, JSON.stringify(changeRes.json?.recalculatedAttempts));
+  check('question examples updated', okStatus(updateQ.status), `${updateQ.status}`);
 
-  // Exam A attempt: field 0 now incorrect → 2 open-text points + 1 yes/no = 3/7 = 43%
-  const attemptAfter = await getAttemptById(adminToken, attemptId);
-  check('exam A score recalculated', attemptAfter?.score === Math.round((3 / 7) * 100), JSON.stringify(attemptAfter?.score));
-  check('exam A passed recalculated to false', attemptAfter?.passed === false, JSON.stringify(attemptAfter?.passed));
-  const gradesAfter = attemptAfter?.manualGrades?.[qidOpen];
-  check('exam A field 0 flipped to incorrect', gradesAfter?.[0] === 0, JSON.stringify(gradesAfter));
+  const attemptAfterEdit = await getAttemptById(adminToken, attemptId);
+  check(
+    'editing examples does not change saved results',
+    attemptAfterEdit?.score === Math.round((4 / 7) * 100),
+    JSON.stringify(attemptAfterEdit?.score)
+  );
+  const gradesAfterEdit = attemptAfterEdit?.manualGrades?.[qidOpen];
+  check(
+    'per-field decisions stay saved',
+    gradesAfterEdit?.[0] === 1 && gradesAfterEdit?.[2] === 0,
+    JSON.stringify(gradesAfterEdit)
+  );
 
-  // Exam B attempt must be untouched
-  const s2After = await getAttemptById(adminToken, s2AttemptId);
-  check('exam B score unchanged', s2After?.score === s2ScoreBefore, `${s2ScoreBefore} -> ${s2After?.score}`);
-  const s2GradesAfter = s2After?.manualGrades?.[s2qOpen];
-  check('exam B field 0 still correct', s2GradesAfter?.[0] === 1, JSON.stringify(s2GradesAfter));
-
-  // ── Repeating the same change is a no-op ──────────────────────────────────
-  const repeatRes = await api('PUT', '/exam-attempts/change-answer-decision', {
-    token: adminToken,
-    body: {
-      examDocumentId: examA.documentId,
-      questionDocumentId: qOpen.documentId,
-      fieldIndex: 0,
-      decision: 'incorrect',
-    },
-  });
-  check('repeated change is a no-op', repeatRes.status === 200 && repeatRes.json?.changed === false, JSON.stringify(repeatRes.json));
-  const repeatAttempt = await getAttemptById(adminToken, attemptId);
-  check('score not doubled by repeated recalculation', repeatAttempt?.score === Math.round((3 / 7) * 100), JSON.stringify(repeatAttempt?.score));
-
-  // ── Student cannot change answer decisions ────────────────────────────────
-  const studentChange = await api('PUT', '/exam-attempts/change-answer-decision', {
-    token: s1Token,
-    body: {
-      examDocumentId: examA.documentId,
-      questionDocumentId: qOpen.documentId,
-      fieldIndex: 0,
-      decision: 'correct',
-    },
-  });
-  check('student cannot change answer decisions (403)', studentChange.status === 403, `${studentChange.status}`);
-
-  // ── Question bank + audit trail ───────────────────────────────────────────
+  // The bank stores example reference text only — no correct/incorrect flags.
   const bankQ = await api('GET', `/questions/${qOpen.documentId}`, { token: adminToken });
   const bankField0 = bankQ.json?.data?.answerFieldsLv?.[0];
-  check('question bank decision updated', bankField0?.correct === false, JSON.stringify(bankField0));
+  check(
+    'question bank stores examples without decision flags',
+    bankField0?.expected?.includes('(reworded)') && bankField0?.correct === undefined,
+    JSON.stringify(bankField0)
+  );
 
-  const db = new Database(DB_PATH, { readonly: true });
-  const audit = db
-    .prepare('SELECT id, old_decision, new_decision, field_index, recalculated_attempts FROM grading_audit_logs ORDER BY id DESC LIMIT 1')
-    .get();
-  const auditAdmin = audit
-    ? db.prepare('SELECT user_id FROM grading_audit_logs_admin_lnk WHERE grading_audit_log_id = ?').get(audit.id)
-    : null;
-  const auditExam = audit
-    ? db.prepare('SELECT exam_id FROM grading_audit_logs_exam_lnk WHERE grading_audit_log_id = ?').get(audit.id)
-    : null;
-  const auditQuestion = audit
-    ? db.prepare('SELECT question_id FROM grading_audit_logs_question_lnk WHERE grading_audit_log_id = ?').get(audit.id)
-    : null;
-  db.close();
-  check('audit trail written', !!audit, 'no audit row');
-  check('audit records old decision', audit?.old_decision === 'correct', JSON.stringify(audit?.old_decision));
-  check('audit records new decision', audit?.new_decision === 'incorrect', JSON.stringify(audit?.new_decision));
-  check('audit records the admin', auditAdmin?.user_id === admin.id, `${auditAdmin?.user_id} vs ${admin.id}`);
-  check('audit links the exam', auditExam?.exam_id === examA.id, `${auditExam?.exam_id} vs ${examA.id}`);
-  check('audit links the question', auditQuestion?.question_id === qOpen.id, `${auditQuestion?.question_id} vs ${qOpen.id}`);
-  const recalcJson = audit ? JSON.parse(audit.recalculated_attempts || '[]') : [];
-  check('audit lists recalculated attempt + scores', recalcJson.length === 1 && typeof recalcJson[0]?.previousScore === 'number' && typeof recalcJson[0]?.newScore === 'number', JSON.stringify(recalcJson));
-
-  const decisionsDb = new Database(DB_PATH, { readonly: true });
-  const override = decisionsDb
-    .prepare('SELECT id, decision, field_index FROM exam_question_decisions ORDER BY id DESC LIMIT 1')
-    .get();
-  const overrideChangedBy = override
-    ? decisionsDb.prepare('SELECT user_id FROM exam_question_decisions_changed_by_lnk WHERE exam_question_decision_id = ?').get(override.id)
-    : null;
-  const overrideExam = override
-    ? decisionsDb.prepare('SELECT exam_id FROM exam_question_decisions_exam_lnk WHERE exam_question_decision_id = ?').get(override.id)
-    : null;
-  decisionsDb.close();
-  check('exam-specific override record written', override?.decision === 'incorrect' && override?.field_index === 0, JSON.stringify(override));
-  check('override tied to exam A', overrideExam?.exam_id === examA.id, JSON.stringify(overrideExam));
-  check('override records the admin', overrideChangedBy?.user_id === admin.id, `${overrideChangedBy?.user_id} vs ${admin.id}`);
+  // Exam B attempt is untouched by exam A's example edits.
+  const s2AfterEdit = await getAttemptById(adminToken, s2AttemptId);
+  check('exam B score unchanged', s2AfterEdit?.score === s2ScoreBefore, `${s2ScoreBefore} -> ${s2AfterEdit?.score}`);
 
   // ── Cleanup ───────────────────────────────────────────────────────────────
   for (const exam of [examA, examB]) {

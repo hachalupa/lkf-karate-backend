@@ -44,6 +44,10 @@
     "showResults": {
       "type": "boolean"
     },
+    "reviewType": {
+      "type": "string",
+      "description": "Set to 'import_review' for answer-key review exams created after a question import. They group imported questions that still need a correct answer, are hidden from students, and are never scored."
+    },
     "questions": {
       "type": "relation",
       "relation": "manyToMany",

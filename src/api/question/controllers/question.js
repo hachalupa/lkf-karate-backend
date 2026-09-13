@@ -14,10 +14,12 @@ const ANSWER_FIELD_KEYS = ['answerFieldsLv', 'answerFieldsRu', 'answerFieldsEn']
  *
  * Returns an error message string, or null when the payload is valid.
  * Rules:
- *  - answerFieldsLv/Ru/En, when present, must be arrays of { expected, correct }.
+ *  - answerFieldsLv/Ru/En, when present, must be arrays of { expected }.
  *  - All three arrays must have the same length (1..MAX_ANSWER_FIELDS) so the
  *    field count is identical in every language.
- *  - Each `correct` flag must be a boolean; `expected` must be a string.
+ *  - `expected` must be a string. There is NO correct/incorrect flag stored on
+ *    the question: the examples are static judge reference text and
+ *    correctness is decided per student answer during exam grading.
  *  - Legacy open-text questions without any answer-field configuration are
  *    allowed (treated as a single field) so old data and the import flows
  *    keep working.
@@ -48,18 +50,28 @@ function validateOpenTextFields(data) {
     for (let i = 0; i < data[key].length; i++) {
       const entry = data[key][i];
       if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
-        return `Answer field ${i + 1} (${key}) must be an object with an expected answer`;
+        return `Answer field ${i + 1} (${key}) must be an object with an example answer`;
       }
       if (typeof entry.expected !== 'string') {
-        return `Answer field ${i + 1} (${key}) needs a text value for the expected answer`;
-      }
-      if (typeof entry.correct !== 'boolean') {
-        return `Answer field ${i + 1} (${key}) needs a correct/incorrect decision`;
+        return `Answer field ${i + 1} (${key}) needs a text value for the example answer`;
       }
     }
   }
 
   return null;
+}
+
+/**
+ * Strip any legacy correct/incorrect decisions from the open-text answer-field
+ * arrays so they are never persisted. Only the judge-facing `expected` example
+ * text is stored on the question.
+ */
+function stripAnswerFieldDecisions(data) {
+  for (const key of ANSWER_FIELD_KEYS) {
+    if (!Array.isArray(data[key])) continue;
+    data[key] = data[key].map((entry) => ({ expected: String(entry?.expected ?? '') }));
+  }
+  return data;
 }
 
 const controllerFactory = createCoreController('api::question.question', ({ strapi }) => ({
@@ -95,9 +107,15 @@ const controllerFactory = createCoreController('api::question.question', ({ stra
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
       return ctx.badRequest('Question payload must be an object');
     }
-    if (data.type === 'open_text') {
+    const hasAnswerFields = ANSWER_FIELD_KEYS.some(
+      (key) => data[key] !== undefined && data[key] !== null,
+    );
+    if (data.type === 'open_text' || hasAnswerFields) {
       const error = validateOpenTextFields(data);
       if (error) return ctx.badRequest(error);
+      // Examples are judge-only reference text — never store decisions on them,
+      // even on partial updates that omit `type`.
+      stripAnswerFieldDecisions(data);
     }
     return null;
   },
@@ -196,3 +214,4 @@ const controllerFactory = createCoreController('api::question.question', ({ stra
 module.exports = controllerFactory;
 // Exported for unit tests (the factory only needs strapi when Strapi calls it).
 module.exports.validateOpenTextFields = validateOpenTextFields;
+module.exports.stripAnswerFieldDecisions = stripAnswerFieldDecisions;

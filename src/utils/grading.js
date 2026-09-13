@@ -5,14 +5,16 @@
  *
  * These functions are PURE (no `strapi` dependency) so they can be unit
  * tested directly and reused by every controller that grades attempts
- * (exam-session.submit, exam-attempt.grade, exam-attempt.changeAnswerDecision).
+ * (exam-session.submit, exam-attempt.grade).
  *
  * Data model:
  *  - open-text questions store one entry per expected answer field in
  *    `answerFieldsLv / answerFieldsRu / answerFieldsEn` — each entry is
- *    `{ expected: string, correct: boolean }`. The array length IS the number
- *    of answer fields (e.g. 6 or 11). The three language arrays must stay in
- *    sync (the admin editor keeps them equal).
+ *    `{ expected: string }`, a judge-facing EXAMPLE only. The array length IS
+ *    the number of answer fields (e.g. 6 or 11). The three language arrays
+ *    must stay in sync (the admin editor keeps them equal).
+ *  - The examples carry NO correct/incorrect flag: correctness is decided per
+ *    student answer during manual grading and stored in `manualGrades`.
  *  - A student's answer to an open-text question is stored in
  *    `answers[questionId]` as an array of strings (one per field). Legacy
  *    attempts stored a plain string — treated as a single field.
@@ -197,25 +199,8 @@ function computeScore({ questions, answers, manualGrades, passingScore = 70 }) {
 }
 
 /**
- * The answer-bank decision for one field of an open-text question.
- * Reads the `correct` flag from the language arrays (Lv first, then Ru, En).
- * Defaults to true when no configuration exists (legacy questions assume the
- * stored expected answer is the official one).
- */
-function getBankDecision(q, fieldIndex) {
-  if (!isOpenTextQuestion(q)) return true;
-  for (const lang of ANSWER_FIELD_LANGS) {
-    const arr = q?.[`answerFields${lang}`];
-    if (Array.isArray(arr) && arr[fieldIndex] != null) {
-      return arr[fieldIndex].correct !== false;
-    }
-  }
-  return true;
-}
-
-/**
- * The expected-answer text (answer-bank reference) for one field, in the
- * requested language, falling back Lv → En.
+ * The example answer (judge reference) for one field, in the requested
+ * language, falling back Lv → En.
  */
 function getExpectedAnswer(q, fieldIndex, language) {
   if (!isOpenTextQuestion(q)) {
@@ -243,6 +228,5 @@ module.exports = {
   getQuestionPoints,
   getQuestionMaxPoints,
   computeScore,
-  getBankDecision,
   getExpectedAnswer,
 };

@@ -91,15 +91,15 @@
     },
     "answerFieldsLv": {
       "type": "json",
-      "description": "Open-text answer fields (Latvian expected answers). Array of { expected, correct } — one entry per answer field. The array length is the number of answer fields students see."
+      "description": "Open-text answer fields (Latvian example answers). Array of { expected } — one entry per answer field. Judge-only reference text; no correct/incorrect flag is stored. The array length is the number of answer fields students see."
     },
     "answerFieldsRu": {
       "type": "json",
-      "description": "Open-text answer fields (Russian expected answers). Array of { expected, correct } — must stay in sync with answerFieldsLv/En."
+      "description": "Open-text answer fields (Russian example answers). Array of { expected } — must stay in sync with answerFieldsLv/En."
     },
     "answerFieldsEn": {
       "type": "json",
-      "description": "Open-text answer fields (English expected answers). Array of { expected, correct } — must stay in sync with answerFieldsLv/Ru."
+      "description": "Open-text answer fields (English example answers). Array of { expected } — must stay in sync with answerFieldsLv/Ru."
     },
     "sourceMode": {
       "type": "enumeration",
