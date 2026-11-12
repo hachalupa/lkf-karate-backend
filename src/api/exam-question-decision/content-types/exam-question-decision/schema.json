@@ -1,0 +1,42 @@
+{
+  "kind": "collectionType",
+  "collectionName": "exam_question_decisions",
+  "info": {
+    "singularName": "exam-question-decision",
+    "pluralName": "exam-question-decisions",
+    "displayName": "Exam Question Decision"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "decision": {
+      "type": "enumeration",
+      "enum": ["correct", "incorrect"],
+      "description": "Exam-specific grading decision for one answer field of one question, overriding the mutable question-bank value for THIS exam only."
+    },
+    "fieldIndex": {
+      "type": "integer",
+      "description": "0-based index of the answer field this decision applies to"
+    },
+    "exam": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::exam.exam",
+      "inversedBy": "questionDecisions"
+    },
+    "question": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::question.question",
+      "inversedBy": "examDecisions"
+    },
+    "changedBy": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "description": "Administrator who set this exam-specific decision"
+    }
+  }
+}

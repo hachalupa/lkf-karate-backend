@@ -651,6 +651,42 @@ export interface ApiExamAttemptExamAttempt extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiExamQuestionDecisionExamQuestionDecision
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'exam_question_decisions';
+  info: {
+    displayName: 'Exam Question Decision';
+    pluralName: 'exam-question-decisions';
+    singularName: 'exam-question-decision';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    changedBy: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    decision: Schema.Attribute.Enumeration<['correct', 'incorrect']>;
+    exam: Schema.Attribute.Relation<'manyToOne', 'api::exam.exam'>;
+    fieldIndex: Schema.Attribute.Integer;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::exam-question-decision.exam-question-decision'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    question: Schema.Attribute.Relation<'manyToOne', 'api::question.question'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiExamExam extends Struct.CollectionTypeSchema {
   collectionName: 'exams';
   info: {
@@ -679,12 +715,55 @@ export interface ApiExamExam extends Struct.CollectionTypeSchema {
     passingScore: Schema.Attribute.Integer;
     publishedAt: Schema.Attribute.DateTime;
     questionCount: Schema.Attribute.Integer;
+    questionDecisions: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::exam-question-decision.exam-question-decision'
+    >;
     questions: Schema.Attribute.Relation<
       'manyToMany',
       'api::question.question'
     >;
+    reviewType: Schema.Attribute.String;
     showResults: Schema.Attribute.Boolean;
     title: Schema.Attribute.String;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiGradingAuditLogGradingAuditLog
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'grading_audit_logs';
+  info: {
+    displayName: 'Grading Audit Log';
+    pluralName: 'grading-audit-logs';
+    singularName: 'grading-audit-log';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    admin: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    exam: Schema.Attribute.Relation<'manyToOne', 'api::exam.exam'>;
+    fieldIndex: Schema.Attribute.Integer;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::grading-audit-log.grading-audit-log'
+    > &
+      Schema.Attribute.Private;
+    newDecision: Schema.Attribute.String;
+    oldDecision: Schema.Attribute.String;
+    publishedAt: Schema.Attribute.DateTime;
+    question: Schema.Attribute.Relation<'manyToOne', 'api::question.question'>;
+    recalculatedAttempts: Schema.Attribute.JSON;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -702,7 +781,12 @@ export interface ApiQuestionQuestion extends Struct.CollectionTypeSchema {
     draftAndPublish: false;
   };
   attributes: {
-    answerStatus: Schema.Attribute.Enumeration<['answered', 'missing']>;
+    answerFieldsEn: Schema.Attribute.JSON;
+    answerFieldsLv: Schema.Attribute.JSON;
+    answerFieldsRu: Schema.Attribute.JSON;
+    answerStatus: Schema.Attribute.Enumeration<
+      ['answered', 'missing', 'fromWord', 'fromQuiz']
+    >;
     chapter: Schema.Attribute.Relation<'manyToOne', 'api::chapter.chapter'>;
     correctAnswer: Schema.Attribute.String;
     correctAnswers: Schema.Attribute.JSON;
@@ -710,6 +794,10 @@ export interface ApiQuestionQuestion extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    examDecisions: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::exam-question-decision.exam-question-decision'
+    >;
     exams: Schema.Attribute.Relation<'manyToMany', 'api::exam.exam'>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
@@ -723,12 +811,19 @@ export interface ApiQuestionQuestion extends Struct.CollectionTypeSchema {
     optionsRu: Schema.Attribute.JSON;
     order: Schema.Attribute.Integer;
     publishedAt: Schema.Attribute.DateTime;
+    questionSetKey: Schema.Attribute.String;
     showInChapter: Schema.Attribute.Boolean;
+    sourceCategory: Schema.Attribute.String;
     sourceDocumentKey: Schema.Attribute.String;
     sourceFile: Schema.Attribute.String;
+    sourceFiles: Schema.Attribute.JSON;
     sourceLang: Schema.Attribute.String;
     sourceMode: Schema.Attribute.Enumeration<['manual', 'pdf']>;
+    sourceYear: Schema.Attribute.Integer;
     textEn: Schema.Attribute.Text;
+    textHashEn: Schema.Attribute.String;
+    textHashLv: Schema.Attribute.String;
+    textHashRu: Schema.Attribute.String;
     textLv: Schema.Attribute.Text;
     textRu: Schema.Attribute.Text;
     type: Schema.Attribute.Enumeration<
@@ -1387,7 +1482,9 @@ declare module '@strapi/strapi' {
       'api::competition.competition': ApiCompetitionCompetition;
       'api::course.course': ApiCourseCourse;
       'api::exam-attempt.exam-attempt': ApiExamAttemptExamAttempt;
+      'api::exam-question-decision.exam-question-decision': ApiExamQuestionDecisionExamQuestionDecision;
       'api::exam.exam': ApiExamExam;
+      'api::grading-audit-log.grading-audit-log': ApiGradingAuditLogGradingAuditLog;
       'api::question.question': ApiQuestionQuestion;
       'api::seminar.seminar': ApiSeminarSeminar;
       'plugin::content-releases.release': PluginContentReleasesRelease;

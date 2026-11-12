@@ -48,7 +48,7 @@
     },
     "topics": {
       "type": "json",
-      "description": "Stable topic keys (kata_theory, kumite_practice, ...) — labels come from frontend translation keys"
+      "description": "Agenda rows — [{ text, hours }] — one row per session (e.g. \"praktiskais Kata uzdevumi\" + \"2\"). Legacy rows may hold i18n keys as plain strings."
     },
     "certificateSignerName": {
       "type": "string"

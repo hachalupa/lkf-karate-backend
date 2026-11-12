@@ -2,6 +2,8 @@
 
 const { createCoreController } = require("@strapi/strapi").factories;
 
+const { computeScore } = require("../../../utils/grading");
+
 // Monitoring/anti-cheat fields — never exposed to students, even their own.
 const MONITORING_FIELDS = [
   "blurEventCount",
@@ -128,16 +130,74 @@ module.exports = createCoreController(
       if (!adminUser?.isAdmin) return ctx.forbidden();
 
       const { id } = ctx.params;
-      const { score, passed, manualGrades } = ctx.request.body;
+      const { manualGrades } = ctx.request.body;
+
+      if (!manualGrades || typeof manualGrades !== "object") {
+        return ctx.badRequest("manualGrades must be an object");
+      }
+      if (Array.isArray(manualGrades)) {
+        return ctx.badRequest("manualGrades must be an object keyed by question id");
+      }
+
+      const attempt = await strapi.db
+        .query("api::exam-attempt.exam-attempt")
+        .findOne({
+          where: { id },
+          populate: ["exam"],
+        });
+
+      if (!attempt) return ctx.notFound("Attempt not found");
+
+      // Validate the manual grades shape before touching the DB. Every value
+      // must be either a legacy 0/1 or a per-field map { [index]: 0|1 }.
+      const validValue = (v) => v === 0 || v === 1 || v === "0" || v === "1";
+      for (const [qid, value] of Object.entries(manualGrades)) {
+        if (validValue(value)) continue;
+        if (value && typeof value === "object" && !Array.isArray(value)) {
+          for (const [index, fieldValue] of Object.entries(value)) {
+            if (!/^\d+$/.test(index)) {
+              return ctx.badRequest(`Invalid field index for question ${qid}`);
+            }
+            if (!validValue(fieldValue)) {
+              return ctx.badRequest(
+                `Invalid grade for question ${qid}, field ${index}`
+              );
+            }
+          }
+          continue;
+        }
+        return ctx.badRequest(`Invalid manual grade for question ${qid}`);
+      }
+
+      const passingScore = attempt.exam?.passingScore || 70;
+      // The backend is the source of truth: score/passed are always computed
+      // from the stored answers + the submitted manual grades. A client cannot
+      // submit its own score/passed values.
+      const computed = computeScore({
+        questions: attempt.questions || [],
+        answers: attempt.answers || {},
+        manualGrades,
+        passingScore,
+      });
 
       const updated = await strapi.db
         .query("api::exam-attempt.exam-attempt")
         .update({
           where: { id },
-          data: { score, passed, manualGrades },
+          data: {
+            manualGrades,
+            score: computed.score,
+            passed: computed.passed,
+          },
         });
 
-      return ctx.send({ data: updated });
+      return ctx.send({
+        data: {
+          ...updated,
+          totalPoints: computed.totalPoints,
+          maxPoints: computed.maxPoints,
+        },
+      });
     },
 
     /**

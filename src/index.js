@@ -1,9 +1,24 @@
 'use strict'
 
+const { createId } = require('@paralleldrive/cuid2')
+const { repairPermissionDocumentIds } = require('./utils/permission-document-ids')
+
 module.exports = {
   register(/*{ strapi }*/) {},
 
   bootstrap: async ({ strapi }) => {
+    // ── Backfill documentIds on permissions created by the query layer ──
+    // Without a documentId these rows make deep-populate crash (see
+    // src/utils/permission-document-ids.js).
+    try {
+      const repaired = await repairPermissionDocumentIds(strapi)
+      if (repaired > 0) {
+        strapi.log.info(`[bootstrap] Backfilled documentId for ${repaired} permission(s)`)
+      }
+    } catch (err) {
+      strapi.log.warn('[bootstrap] Could not repair permission documentIds:', err.message)
+    }
+
     // ── Set the frontend reset password URL in the plugin store ──
     // This ensures forgot-password emails link to the React frontend
     // instead of the Strapi admin panel.
@@ -53,7 +68,7 @@ module.exports = {
         if (granted.length === 0) {
           await strapi
             .query('plugin::users-permissions.permission')
-            .create({ data: { action, role: authRole.id } })
+            .create({ data: { documentId: createId(), action, role: authRole.id } })
           strapi.log.info('[bootstrap] Granted exam-attempt.findOne to Authenticated role')
         }
       }
@@ -81,12 +96,49 @@ module.exports = {
         if (granted.length === 0) {
           await strapi
             .query('plugin::users-permissions.permission')
-            .create({ data: { action, role: authRoleForMonitoring.id } })
+            .create({ data: { documentId: createId(), action, role: authRoleForMonitoring.id } })
           strapi.log.info('[bootstrap] Granted exam-attempt.monitoring to Authenticated role')
         }
       }
     } catch (err) {
       strapi.log.warn('[bootstrap] Could not ensure exam-attempt.monitoring permission:', err.message)
+    }
+
+    // ── Allow admin grading actions through the permission layer ──
+    // PUT /exam-attempts/grade/:id and GET /exam-attempts/all are admin-only;
+    // the controllers re-check isAdmin. Grant idempotently so fresh DBs / resets
+    // work too (same pattern as findOne / monitoring / bulkUpdateAnswers).
+    try {
+      const actions = [
+        "api::exam-attempt.exam-attempt.findAll",
+        "api::exam-attempt.exam-attempt.grade",
+      ];
+      const authRoleForGrading = await strapi
+        .query("plugin::users-permissions.role")
+        .findOne({ where: { type: "authenticated" } });
+
+      if (!authRoleForGrading) {
+        strapi.log.warn(
+          "[bootstrap] Authenticated role not found — cannot grant grading permissions"
+        );
+      } else {
+        for (const action of actions) {
+          const granted = await strapi
+            .query("plugin::users-permissions.permission")
+            .findMany({ where: { action, role: authRoleForGrading.id } });
+          if (granted.length === 0) {
+            await strapi
+              .query("plugin::users-permissions.permission")
+              .create({ data: { documentId: createId(), action, role: authRoleForGrading.id } });
+            strapi.log.info(`[bootstrap] Granted ${action} to Authenticated role`);
+          }
+        }
+      }
+    } catch (err) {
+      strapi.log.warn(
+        "[bootstrap] Could not ensure exam-attempt grading permissions:",
+        err.message
+      );
     }
 
     // ── Allow the bulk-update-answers action through the permission layer ──
@@ -112,7 +164,7 @@ module.exports = {
         if (granted.length === 0) {
           await strapi
             .query('plugin::users-permissions.permission')
-            .create({ data: { action, role: authRoleForBulk.id } })
+            .create({ data: { documentId: createId(), action, role: authRoleForBulk.id } })
           strapi.log.info('[bootstrap] Granted question.bulkUpdateAnswers to Authenticated role')
         }
       }
@@ -120,12 +172,17 @@ module.exports = {
       strapi.log.warn('[bootstrap] Could not ensure question.bulkUpdateAnswers permission:', err.message)
     }
 
-    // ── Public read access to competitions for the landing-page calendar ──
-    // Competitions are for everyone (seminars are judges-only), so guests must
-    // be able to list them without an account. Grant the Public role the
-    // find + findOne actions idempotently so fresh DBs / resets work too.
+    // ── Public read access to seminars + competitions (calendar events) ──
+    // The landing page shows competitions to everyone, and seminars are the
+    // same kind of public calendar information. Guests must be able to list
+    // them without an account — otherwise the calendar 403s the moment one of
+    // the collections is empty (Strapi checks the permission before the data).
+    // Grant the Public role the find + findOne actions idempotently so fresh
+    // DBs / resets work too.
     try {
       const actions = [
+        'api::seminar.seminar.find',
+        'api::seminar.seminar.findOne',
         'api::competition.competition.find',
         'api::competition.competition.findOne',
       ]
@@ -134,7 +191,7 @@ module.exports = {
         .findOne({ where: { type: 'public' } })
 
       if (!publicRole) {
-        strapi.log.warn('[bootstrap] Public role not found — cannot grant competition read permissions')
+        strapi.log.warn('[bootstrap] Public role not found — cannot grant seminar/competition read permissions')
       } else {
         for (const action of actions) {
           const granted = await strapi
@@ -143,13 +200,13 @@ module.exports = {
           if (granted.length === 0) {
             await strapi
               .query('plugin::users-permissions.permission')
-              .create({ data: { action, role: publicRole.id } })
+              .create({ data: { documentId: createId(), action, role: publicRole.id } })
             strapi.log.info(`[bootstrap] Granted ${action} to Public role`)
           }
         }
       }
     } catch (err) {
-      strapi.log.warn('[bootstrap] Could not ensure competition read permissions:', err.message)
+      strapi.log.warn('[bootstrap] Could not ensure seminar/competition read permissions:', err.message)
     }
 
     // ── Authenticated read access to competitions and seminars ──

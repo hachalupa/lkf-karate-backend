@@ -89,6 +89,18 @@
     "optionsEn": {
       "type": "json"
     },
+    "answerFieldsLv": {
+      "type": "json",
+      "description": "Open-text answer fields (Latvian example answers). Array of { expected } — one entry per answer field. Judge-only reference text; no correct/incorrect flag is stored. The array length is the number of answer fields students see."
+    },
+    "answerFieldsRu": {
+      "type": "json",
+      "description": "Open-text answer fields (Russian example answers). Array of { expected } — must stay in sync with answerFieldsLv/En."
+    },
+    "answerFieldsEn": {
+      "type": "json",
+      "description": "Open-text answer fields (English example answers). Array of { expected } — must stay in sync with answerFieldsLv/Ru."
+    },
     "sourceMode": {
       "type": "enumeration",
       "enum": [
@@ -103,8 +115,37 @@
       "type": "enumeration",
       "enum": [
         "answered",
-        "missing"
+        "missing",
+        "fromWord",
+        "fromQuiz"
       ]
+    },
+    "questionSetKey": {
+      "type": "string"
+    },
+    "sourceYear": {
+      "type": "integer"
+    },
+    "sourceCategory": {
+      "type": "string"
+    },
+    "sourceFiles": {
+      "type": "json"
+    },
+    "textHashEn": {
+      "type": "string"
+    },
+    "textHashLv": {
+      "type": "string"
+    },
+    "textHashRu": {
+      "type": "string"
+    },
+    "examDecisions": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::exam-question-decision.exam-question-decision",
+      "mappedBy": "question"
     }
   }
 }
