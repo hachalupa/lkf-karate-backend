@@ -41,29 +41,85 @@ const COURSES = [
   },
 ];
 
+/**
+ * Assert that a course really is published, and fail loudly if it is not.
+ *
+ * Draft-and-publish stores a course as TWO rows sharing one documentId (a draft
+ * working copy + a published version), so a plain read returns the draft row,
+ * whose `publishedAt` is always null — see AGENTS.md §5.1. Every lookup below
+ * therefore pins `status: 'published'` instead of trusting the first row.
+ */
+function assertPublished(course, courseData, action) {
+  if (!course || !course.publishedAt) {
+    throw new Error(
+      `Course "${courseData.titleEn}" is still unpublished after ${action} — check this seed.`
+    );
+  }
+}
+
 async function seedCourses() {
   try {
     console.log('Seeding courses...');
 
     for (const courseData of COURSES) {
-      // Check if a course with this slug already exists
-      const existing = await strapi.documents('api::course.course').findFirst({
+      // Only a PUBLISHED course counts as "already there". Reading without a
+      // status would find the draft copy of an unpublished course and skip it,
+      // leaving the student app showing "0 of 0 courses".
+      const published = await strapi.documents('api::course.course').findFirst({
         filters: { slug: courseData.slug },
+        status: 'published',
       });
 
-      if (existing) {
-        console.log(`  ⏩ Course "${courseData.titleEn}" already exists (ID: ${existing.id}), skipping.`);
+      if (published) {
+        console.log(
+          `  ⏩ Course "${courseData.titleEn}" already published (ID: ${published.id}), skipping.`
+        );
         continue;
       }
 
-      const course = await strapi.documents('api::course.course').create({
-        data: {
-          ...courseData,
-          publishedAt: new Date().toISOString(),
-        },
+      // Nothing published: either nothing exists, or a previous run left a
+      // draft behind (Strapi strips `publishedAt` out of `data`, so the old
+      // version of this script created unpublished rows).
+      const draft = await strapi.documents('api::course.course').findFirst({
+        filters: { slug: courseData.slug },
+        status: 'draft',
       });
 
-      console.log(`  ✅ Course "${courseData.titleEn}" created (ID: ${course.id})`);
+      if (draft) {
+        const repaired = await strapi.documents('api::course.course').update({
+          documentId: draft.documentId,
+          data: {},
+          status: 'published',
+        });
+        assertPublished(
+          await strapi.documents('api::course.course').findOne({
+            documentId: draft.documentId,
+            status: 'published',
+          }) || repaired,
+          courseData,
+          'publishing the draft'
+        );
+        console.log(`  🔧 Course "${courseData.titleEn}" was an unpublished draft — published.`);
+        continue;
+      }
+
+      // Publishing goes through the `status` option, NOT through `publishedAt`
+      // in `data`: the document service strips that field, which left every
+      // course as a draft and made the whole course flow invisible.
+      // (seed-events.js documents the same trap.)
+      const course = await strapi.documents('api::course.course').create({
+        data: courseData,
+        status: 'published',
+      });
+
+      // Fail loudly rather than silently leaving an un-publishable draft.
+      const saved = await strapi.documents('api::course.course').findOne({
+        documentId: course.documentId,
+        status: 'published',
+      });
+      assertPublished(saved, courseData, 'creation');
+
+      console.log(`  ✅ Course "${courseData.titleEn}" created + published (ID: ${course.id})`);
     }
 
     console.log('Done — all courses processed.');

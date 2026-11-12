@@ -1,5 +1,7 @@
 "use strict";
 
+const { isCorrect } = require("../../../utils/answer-grading");
+
 // This Strapi setup stores a draft + a published row per document, so raw
 // db queries return every document twice. Collapse to one row per documentId,
 // preferring the published row (publishedAt set) when both exist.
@@ -13,6 +15,46 @@ function dedupeByDocumentId(rows) {
     }
   }
   return Array.from(byDoc.values());
+}
+
+/**
+ * Question shape sent to the student UI.
+ *
+ * Every language field travels to the client and is resolved there with
+ * `getLocalizedField` / `getLocalizedArray` (AGENTS §6) — the backend must not
+ * pick a language, or a Russian reader silently gets Latvian text no matter
+ * what the UI asks for. `correctAnswer` is only attached by the callers that
+ * are allowed to reveal it (`showResults === true`, and the intentional
+ * self-study exception in /exams/quick-quiz).
+ *
+ * The flattened `text` / `options` are kept as a last-resort fallback so an
+ * older client that reads the raw field still renders something.
+ */
+function toClientQuestion(q, { includeCorrectAnswer = false } = {}) {
+  const question = {
+    id: q.id,
+    documentId: q.documentId,
+    text: q.text || q.textLv || q.textEn || q.textRu || "",
+    textLv: q.textLv ?? null,
+    textRu: q.textRu ?? null,
+    textEn: q.textEn ?? null,
+    type: q.type,
+    options: (q.options?.length > 0 ? q.options : null) ||
+             (q.optionsLv?.length > 0 ? q.optionsLv : null) ||
+             (q.optionsRu?.length > 0 ? q.optionsRu : null) ||
+             (q.optionsEn?.length > 0 ? q.optionsEn : null) ||
+             ["true", "false"],
+    optionsLv: Array.isArray(q.optionsLv) ? q.optionsLv : null,
+    optionsRu: Array.isArray(q.optionsRu) ? q.optionsRu : null,
+    optionsEn: Array.isArray(q.optionsEn) ? q.optionsEn : null,
+    media: q.media,
+    videoAkaUrl: q.videoAkaUrl || null,
+    videoAoUrl: q.videoAoUrl || null,
+  };
+  if (includeCorrectAnswer) {
+    question.correctAnswer = q.correctAnswer;
+  }
+  return question;
 }
 
 module.exports = {
@@ -119,27 +161,10 @@ module.exports = {
       );
 
       const showResultsInResume = exam.showResults === true;
-      const questionsForClient = orderedQuestions.map((q) => {
-        const question = {
-          id: q.id,
-          documentId: q.documentId,
-          text: q.text || q.textLv || q.textEn || q.textRu || "",
-          type: q.type,
-          options: (q.options?.length > 0 ? q.options : null) ||
-                   (q.optionsLv?.length > 0 ? q.optionsLv : null) ||
-                   (q.optionsRu?.length > 0 ? q.optionsRu : null) ||
-                   (q.optionsEn?.length > 0 ? q.optionsEn : null) ||
-                   ["true", "false"],
-          media: q.media,
-          videoAkaUrl: q.videoAkaUrl || null,
-          videoAoUrl: q.videoAoUrl || null,
-        };
-        // Only send correct answers to client if results are released
-        if (showResultsInResume) {
-          question.correctAnswer = q.correctAnswer;
-        }
-        return question;
-      });
+      // Only send correct answers to client if results are released
+      const questionsForClient = orderedQuestions.map((q) =>
+        toClientQuestion(q, { includeCorrectAnswer: showResultsInResume }),
+      );
 
       return ctx.send({
         attemptId: existing.id,
@@ -174,21 +199,8 @@ module.exports = {
       );
     }
 
-    // Strip correct answers before sending to client
-    const questionsForClient = selected.map((q) => ({
-      id: q.id,
-      documentId: q.documentId,
-      text: q.text || q.textLv || q.textEn || q.textRu || "",
-      type: q.type,
-      options: (q.options?.length > 0 ? q.options : null) ||
-               (q.optionsLv?.length > 0 ? q.optionsLv : null) ||
-               (q.optionsRu?.length > 0 ? q.optionsRu : null) ||
-               (q.optionsEn?.length > 0 ? q.optionsEn : null) ||
-               ["true", "false"],
-      media: q.media,
-      videoAkaUrl: q.videoAkaUrl || null,
-      videoAoUrl: q.videoAoUrl || null,
-    }));
+    // Strip correct answers before sending to client (no includeCorrectAnswer)
+    const questionsForClient = selected.map((q) => toClientQuestion(q));
 
     // Store full questions (with answers) in the attempt
     const attempt = await strapi.db
@@ -298,29 +310,11 @@ module.exports = {
 
     let correct = 0;
     questions.forEach((q) => {
-      const userAnswer = answers[q.id];
-      // Multiple-select (multiple_choice): grade by set equality on the arrays.
-      // Only treat correctAnswers as the expected list when it actually holds
-      // values — an empty array must fall through to the single-answer check.
-      const expectedList =
-        Array.isArray(q.correctAnswers) && q.correctAnswers.length > 0
-          ? q.correctAnswers
-          : null;
-      if (expectedList) {
-        const ua = (Array.isArray(userAnswer) ? userAnswer : [])
-          .map((v) => String(v))
-          .sort();
-        const ex = expectedList.map((v) => String(v)).sort();
-        if (ua.length === ex.length && ua.every((v, i) => v === ex[i])) {
-          correct++;
-        }
-      } else if (q.correctAnswer !== undefined && q.correctAnswer !== null) {
-        if (
-          String(userAnswer).toLowerCase() ===
-          String(q.correctAnswer).toLowerCase()
-        ) {
-          correct++;
-        }
+      // Grading is language-aware: the answer is matched by option index, so a
+      // student reading Russian options is graded exactly like one reading the
+      // Latvian the answer was authored in (see utils/answer-grading.js).
+      if (isCorrect(q, answers[q.id])) {
+        correct++;
       }
     });
 
@@ -418,21 +412,11 @@ module.exports = {
     const shuffled = allQuestions.sort(() => Math.random() - 0.5);
     const selected = shuffled.slice(0, questionCount);
 
-    const questionsForClient = selected.map((q) => ({
-      id: q.id,
-      documentId: q.documentId,
-      text: q.text || q.textLv || q.textEn || q.textRu || "",
-      type: q.type,
-      options: (q.options?.length > 0 ? q.options : null) ||
-               (q.optionsLv?.length > 0 ? q.optionsLv : null) ||
-               (q.optionsRu?.length > 0 ? q.optionsRu : null) ||
-               (q.optionsEn?.length > 0 ? q.optionsEn : null) ||
-               ["true", "false"],
-      media: q.media,
-      videoAkaUrl: q.videoAkaUrl || null,
-      videoAoUrl: q.videoAoUrl || null,
-      correctAnswer: q.correctAnswer,
-    }));
+    // Quick quiz is the deliberate self-study exception: it ships the answers
+    // on purpose, so students can check themselves (AGENTS §5.4).
+    const questionsForClient = selected.map((q) =>
+      toClientQuestion(q, { includeCorrectAnswer: true }),
+    );
 
     const attempt = await strapi.db
       .query("api::exam-attempt.exam-attempt")

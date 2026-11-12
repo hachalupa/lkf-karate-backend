@@ -129,3 +129,14 @@ dist
 build
 .strapi-updater.json
 .strapi-cloud.json
+
+###########################
+# Local AI-agent guidance
+# Workspace-local only - not for GitHub.
+###########################
+AGENTS.md
+.claude/
+.cursor/
+.agent/
+.agents/
+.impeccable/

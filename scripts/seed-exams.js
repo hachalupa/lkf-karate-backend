@@ -32,6 +32,22 @@ async function seedExams() {
   }
   console.log(`  Using course: "${course.titleLv || course.title}" (${course.documentId})`);
 
+  // Attach real questions to every exam. Exams deliberately have NO random
+  // fallback pool, so a stored questionCount with no selection is a dead end:
+  // the student card promises "N questions" and starting the exam then errors.
+  const courseQuestions = await strapi.db
+    .query('api::question.question')
+    .findMany({
+      where: { course: { documentId: { $eq: course.documentId } } },
+      orderBy: { order: 'asc' },
+    })
+
+  if (courseQuestions.length === 0) {
+    console.log('  ⚠️ No questions found for this course — exams will get 0 questions.');
+  } else {
+    console.log(`  Found ${courseQuestions.length} question(s) to draw from.`);
+  }
+
   let created = 0;
   let skipped = 0;
 
@@ -54,28 +70,52 @@ async function seedExams() {
           title: { $eq: tmpl.title },
           openAt: { $eq: openAt.toISOString() },
         },
+        populate: ['questions'],
       });
 
       if (existing) {
+        // Repair an exam that an earlier run left promising questions it does
+        // not have (a stored questionCount with an empty selection).
+        const hasQuestions = (existing.questions || []).length > 0
+        if (!hasQuestions && (existing.questionCount || 0) > 0) {
+          const repairSelection = courseQuestions.slice(0, tmpl.questionCount)
+          await strapi.documents('api::exam.exam').update({
+            documentId: existing.documentId,
+            data: {
+              questionCount: repairSelection.length,
+              questions: repairSelection.map((q) => q.documentId),
+            },
+          })
+          console.log(
+            `  🔧 "${tmpl.title}" had no questions selected — linked ${repairSelection.length}.`
+          )
+          continue
+        }
         console.log(`  ⏩ "${tmpl.title}" @ ${openAt.toISOString().slice(0, 16)} already exists, skipping.`);
         skipped++;
         continue;
       }
+
+      // Never claim more questions than the course can supply.
+      const selected = courseQuestions.slice(0, tmpl.questionCount)
 
       const doc = await strapi.documents('api::exam.exam').create({
         data: {
           title: tmpl.title,
           duration: tmpl.duration,
           passingScore: tmpl.passingScore,
-          questionCount: tmpl.questionCount,
+          questionCount: selected.length,
           showResults: tmpl.showResults,
           openAt: openAt.toISOString(),
           closeAt: closeAt.toISOString(),
           course: course.documentId,
+          questions: selected.map((q) => q.documentId),
         },
       });
 
-      console.log(`  ✅ "${tmpl.title}" created (${doc.documentId}) @ ${openAt.toISOString().slice(0, 16)}`);
+      console.log(
+        `  ✅ "${tmpl.title}" created (${doc.documentId}) with ${selected.length} question(s) @ ${openAt.toISOString().slice(0, 16)}`
+      );
       created++;
     }
   }

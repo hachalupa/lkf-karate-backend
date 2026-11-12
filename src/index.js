@@ -151,5 +151,89 @@ module.exports = {
     } catch (err) {
       strapi.log.warn('[bootstrap] Could not ensure competition read permissions:', err.message)
     }
+
+    // ── Authenticated read access to competitions and seminars ──
+    // The grant above only covers the Public role. Strapi evaluates a request
+    // that carries a JWT against the Authenticated role ALONE — roles do not
+    // inherit — so signed-in users got 403 for competitions even though guests
+    // could read them, and seminars had no permission records at all. Because
+    // useCalendarEvents() fetches with Promise.all, that single 403 blanked the
+    // whole calendar on /dashboard and /events, and made the admin Seminars and
+    // Competitions pages dead for everyone.
+    //
+    // Seminars are judges-only, so they are granted to Authenticated and
+    // deliberately NOT to Public (matching the intent above).
+    try {
+      const calendarActions = [
+        'api::competition.competition.find',
+        'api::competition.competition.findOne',
+        'api::seminar.seminar.find',
+        'api::seminar.seminar.findOne',
+      ]
+      const authRoleForCalendar = await strapi
+        .query('plugin::users-permissions.role')
+        .findOne({ where: { type: 'authenticated' } })
+
+      if (!authRoleForCalendar) {
+        strapi.log.warn('[bootstrap] Authenticated role not found — cannot grant calendar read permissions')
+      } else {
+        for (const action of calendarActions) {
+          const granted = await strapi
+            .query('plugin::users-permissions.permission')
+            .findMany({ where: { action, role: authRoleForCalendar.id } })
+          if (granted.length === 0) {
+            await strapi
+              .query('plugin::users-permissions.permission')
+              .create({ data: { action, role: authRoleForCalendar.id } })
+            strapi.log.info(`[bootstrap] Granted ${action} to Authenticated role`)
+          }
+        }
+      }
+    } catch (err) {
+      strapi.log.warn('[bootstrap] Could not ensure calendar read permissions:', err.message)
+    }
+
+    // ── Seminar / competition writes for the admin panel ──
+    // No `api::seminar.*` write records existed at all and competitions had
+    // only Public read, so POST/PUT/DELETE from /admin/seminars and
+    // /admin/competitions were rejected by the permission layer (403) before
+    // any controller or policy could run — the pages were dead on save.
+    //
+    // These grants are deliberately narrow in intent: the permission layer only
+    // decides "may this role reach the route". The real authorization is the
+    // `global::is-admin` policy attached to those routes, which rejects any
+    // caller whose `isAdmin` flag is not set (admins and students share the
+    // `authenticated` role, so the role alone cannot separate them).
+    try {
+      const writeActions = [
+        'api::seminar.seminar.create',
+        'api::seminar.seminar.update',
+        'api::seminar.seminar.delete',
+        'api::competition.competition.create',
+        'api::competition.competition.update',
+        'api::competition.competition.delete',
+      ]
+      const authRoleForWrites = await strapi
+        .query('plugin::users-permissions.role')
+        .findOne({ where: { type: 'authenticated' } })
+
+      if (!authRoleForWrites) {
+        strapi.log.warn('[bootstrap] Authenticated role not found — cannot grant seminar/competition writes')
+      } else {
+        for (const action of writeActions) {
+          const granted = await strapi
+            .query('plugin::users-permissions.permission')
+            .findMany({ where: { action, role: authRoleForWrites.id } })
+          if (granted.length === 0) {
+            await strapi
+              .query('plugin::users-permissions.permission')
+              .create({ data: { action, role: authRoleForWrites.id } })
+            strapi.log.info(`[bootstrap] Granted ${action} to Authenticated role`)
+          }
+        }
+      }
+    } catch (err) {
+      strapi.log.warn('[bootstrap] Could not ensure seminar/competition write permissions:', err.message)
+    }
   },
 }

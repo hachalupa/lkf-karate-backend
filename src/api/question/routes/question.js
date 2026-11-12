@@ -20,14 +20,19 @@ module.exports = {
       method: 'POST',
       path: '/questions',
       handler: 'question.create',
-      config: { policies: [], middlewares: [] },
+      // Writes are admin-only (global::is-admin). Reads stay open to students.
+      config: { policies: ['global::is-admin'], middlewares: [] },
     },
     // Static route before :id routes (koa-router matches in order)
     {
       method: 'PUT',
       path: '/questions/bulk-update-answers',
       handler: 'question.bulkUpdateAnswers',
-      config: { policies: [], middlewares: [] },
+      // Gated like every other catalogue write. The controller also re-checks
+      // isAdmin (AGENTS.md §5), so this is the outer of two locks, not the only
+      // one — `scripts/check-authz.js` fails if either the policy or the
+      // controller check is removed.
+      config: { policies: ['global::is-admin'], middlewares: [] },
     },
     {
       method: 'GET',
@@ -39,13 +44,13 @@ module.exports = {
       method: 'PUT',
       path: '/questions/:id',
       handler: 'question.update',
-      config: { policies: [], middlewares: [] },
+      config: { policies: ['global::is-admin'], middlewares: [] },
     },
     {
       method: 'DELETE',
       path: '/questions/:id',
       handler: 'question.delete',
-      config: { policies: [], middlewares: [] },
+      config: { policies: ['global::is-admin'], middlewares: [] },
     },
   ],
 };

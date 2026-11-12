@@ -11,30 +11,57 @@
 // Manual: npx knex migrate:latest --knexfile config/knexfile.js
 
 /**
+ * Create one index, but only when its table already exists.
+ *
+ * Strapi runs these custom migrations BEFORE it creates the content-type
+ * tables (see `sync()` in @strapi/database: `migrations.up()` is awaited, then
+ * `syncSchema()` runs). On a brand-new database every one of these tables is
+ * still missing, so a bare `CREATE INDEX` aborts the whole boot with
+ * "no such table" and a fresh clone can never start.
+ *
+ * Skipping is safe: these are performance indexes, not constraints. On an
+ * existing database (including the Postgres deployments this file was written
+ * for) every table is present and all indexes are created as before. A new
+ * install simply comes up without them — the migration is already recorded, so
+ * re-running it later is a deliberate, manual step.
+ *
+ * @param { import("knex").Knex } knex
+ * @param {string} table
+ * @param {string} sql
+ */
+async function createIndexIfTableExists(knex, table, sql) {
+  if (!(await knex.schema.hasTable(table))) {
+    console.log(`[Migration] Table \`${table}\` does not exist yet — skipping its index`);
+    return;
+  }
+  await knex.schema.raw(sql);
+}
+
+/**
  * @param { import("knex").Knex } knex
  */
 exports.up = async function (knex) {
   // ── exam_attempts _lnk tables ──────────────────────────────────────────
 
-  await knex.schema.raw(`
+  await createIndexIfTableExists(knex, 'exam_attempts_user_lnk', `
     CREATE INDEX IF NOT EXISTS idx_exam_attempts_user_lnk_user
     ON exam_attempts_user_lnk (user_id);
   `);
 
-  await knex.schema.raw(`
+  await createIndexIfTableExists(knex, 'exam_attempts_exam_lnk', `
     CREATE INDEX IF NOT EXISTS idx_exam_attempts_exam_lnk_exam
     ON exam_attempts_exam_lnk (exam_id);
   `);
 
   // exam_attempts.submitted_at — used in dashboard time-range queries
-  await knex.schema.raw(`
+  await createIndexIfTableExists(knex, 'exam_attempts', `
     CREATE INDEX IF NOT EXISTS idx_exam_attempts_submitted_at
     ON exam_attempts (submitted_at);
   `);
 
   // ── chapter_progresses _lnk tables ─────────────────────────────────────
 
-  await knex.schema.raw(`
+  await createIndexIfTableExists(knex, 'chapter_progresses_users_permissions_user_lnk', `
     CREATE INDEX IF NOT EXISTS idx_chapter_progress_user_lnk_user
     ON chapter_progresses_users_permissions_user_lnk (user_id);
   `);
@@ -42,19 +69,19 @@ exports.up = async function (knex) {
   // ── exams ──────────────────────────────────────────────────────────────
 
   // exams.open_at — used for "upcoming exam" dashboard query (sorted asc)
-  await knex.schema.raw(`
+  await createIndexIfTableExists(knex, 'exams', `
     CREATE INDEX IF NOT EXISTS idx_exams_open_at
     ON exams (open_at);
   `);
 
   // ── questions _lnk tables ──────────────────────────────────────────────
 
-  await knex.schema.raw(`
+  await createIndexIfTableExists(knex, 'questions_course_lnk', `
     CREATE INDEX IF NOT EXISTS idx_questions_course_lnk_course
     ON questions_course_lnk (course_id);
   `);
 
-  await knex.schema.raw(`
+  await createIndexIfTableExists(knex, 'questions_chapter_lnk', `
     CREATE INDEX IF NOT EXISTS idx_questions_chapter_lnk_chapter
     ON questions_chapter_lnk (chapter_id);
   `);

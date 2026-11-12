@@ -73,7 +73,8 @@ module.exports = (plugin) => {
   // ── BUG-004: harden user updates ─────────────────────────────────────────
   // Non-admins may only update their own profile and must not be able to set
   // privileged fields (verification, isAdmin, rejectionReason, role, blocked,
-  // confirmed).
+  // confirmed). `params.id === 'me'` is resolved to the caller first, so the
+  // self-update endpoint is governed by the same ownership rule as /users/:id.
   const originalDestroy = plugin.controllers.user.destroy
   plugin.controllers.user.destroy = async (ctx) => {
     // No user.destroy grant exists today, but the plugin controller has no
@@ -86,6 +87,17 @@ module.exports = (plugin) => {
   plugin.controllers.user.update = async (ctx) => {
     const caller = ctx.state.user
     if (!caller) return ctx.unauthorized()
+
+    // Strapi's documented self-update endpoint is PUT /users/me, which the
+    // content-api router matches as PUT /users/:id, so `ctx.params.id` is the
+    // literal "me". Normalise it to the caller's id here, before the
+    // ownership check: the plugin's own update controller fetches the record
+    // with this id (`user.fetch(id)`), so leaving "me" in place would turn a
+    // permitted self-update into a 404. "me" always means the caller — it can
+    // never be used to name somebody else.
+    if (ctx.params.id === 'me') {
+      ctx.params.id = caller.id
+    }
 
     const admin = await isAdminUser(ctx)
     const targetId = String(ctx.params.id)
